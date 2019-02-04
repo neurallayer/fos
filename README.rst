@@ -44,7 +44,7 @@ And we are ready to start the training::
 
 Examples
 ========
-You can find several example Jupyter notebooks `here <https://github.com/smarterai/fos/examples>`_, 
+You can find several example Jupyter notebooks `here <https://github.com/innerlogic/fos/examples>`_, 
 or even more convenient try them directly in a Google Colab environment:
 
     1) Basic Example

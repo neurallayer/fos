@@ -43,7 +43,7 @@ class MultiMeter(Meter):
         '''Add a meter to this multimeter'''
         self.meters.append(meter)
         
-    def update(self, key:str, value):
+    def update(self, key, value):
         for meter in self.meters:
             meter.update(key, value)
     
@@ -68,7 +68,7 @@ class BaseMeter(Meter):
         self.calculators = calculators
         self.updated = False
         
-    def update(self, key:str, value):
+    def update(self, key, value):
         if key in self.calculators:
             calc = self.calculators[key]
             calc.add(value)
@@ -97,14 +97,14 @@ class NotebookMeter(Meter):
             self.tqdm = tqdm(total=100, mininterval=1, bar_format=self.bar_format)
         return self.tqdm
         
-    def update(self, key:str, value):
+    def update(self, key, value):
         if key not in self.calculators:
             self.calculators[key] = AvgCalc()
         
         calc = self.calculators[key]  
         calc.add(value)
         
-    def format(self, key:str, value):
+    def format(self, key, value):
         try:
             value = float(value)
             result = "{}={:.5f} ".format(key, value)
@@ -182,7 +182,7 @@ class TensorBoardMeter(BaseMeter):
     def write(self, name, value, step):
        
         if isinstance(value, dict):
-            for k,v in value.items():
+            for k, v in value.items():
                 self.write(name+":"+k, v, step)
         else:
             try:

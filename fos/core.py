@@ -16,8 +16,6 @@ class SuperModel(nn.Module):
            predictor (nn.Module): The model that needs to be trained. 
            loss_fn (function): The loss function (objective) that should be used to train the model
            metrics (dict): The metrics that should be generated during the training and validation
-
-            
     '''
     
     def __init__(self, predictor, loss_fn, metrics={}):
@@ -26,11 +24,10 @@ class SuperModel(nn.Module):
         self.metrics = metrics
         self.loss_fn = loss_fn
         self.step = 0
-        self.output = {}
+
     
     def handle_metrics(self, loss, y, t):
-        '''call the configured prediction metrics and store the results
-           in self.output
+        '''Invoke the configured metrics functions return the result
         
            Args:
                loss (scaler): the loss value
@@ -41,7 +38,7 @@ class SuperModel(nn.Module):
         
         output["loss"] = loss
         for key, fn in self.metrics.items():
-            value = fn(y,t)
+            value = fn(y, t)
             if value is not None:
                 output[key] = value 
         return output
@@ -58,7 +55,7 @@ class SuperModel(nn.Module):
         return loss, y
 
     def predict(self, x):
-        '''Predict a batch of data and return the result. No metrics
+        '''Predict a single batch of data and return the result. No metrics
            will be generated when predicitng values.
         
            Args:
@@ -68,19 +65,22 @@ class SuperModel(nn.Module):
         return y 
         
     def validate(self, x, t):
-        '''Perform a single validation iteration. If there prediction metrics
-           configured, they will be called and hte result is stored in self.output
+        '''Perform a single validation iteration. If there are metrics
+           configured, they will be invoked and the result is returned together
+           with the loss value.
     
            Args:
                x (Tensor): the input tensor
                t (Tensor): the target tensor
         '''
-        loss, y = self(x,t)
+        loss, y = self(x, t)
         return self.handle_metrics(loss.item(), y, t)
            
     def learn(self, x, t, optim):
         '''Perform a single learning step. This method is normally invoked by 
-           the trainer but can also be invoked directly.
+           the trainer but can also be invoked directly. If there are metrics
+           configured, they will be invoked and the result is returned together
+           with the loss value.
            
            Args:
                x (Tensor): the input data
@@ -90,9 +90,9 @@ class SuperModel(nn.Module):
         '''
         self.output = {}
         self.step += 1
-        loss, y = self(x,t)
+        loss, y = self(x, t)
         loss.backward()
-        return self.handle_metrics(loss.item(), y,t)
+        return self.handle_metrics(loss.item(), y, t)
     
  
     def state_dict(self):
@@ -107,48 +107,55 @@ class SuperModel(nn.Module):
 
 
 class Freezer():
-    '''Provides funcitonality to freeze/unfreeze layers based on hteir name 
-       in the model during training.
-           
-       This comes in most handy during transfer learning and 
-       at the beginning of the training cycle you only want to train
-       the newly added layers.
+    '''Provides functionality to freeze/unfreeze parameters in a model based 
+       on their name. This comes in most handy during transfer learning at 
+       the beginning of the training you only want to train the newly added layers.
+       
+       Args:
+           model (nn.Module): the model you want to use. 
+            
+       Examples:
+           freezer = Freezer(my_Model)
+           freezer.freeze() # freeze all layers
+           freezer.unfreeze("fc") # unfreeze last layer
     '''
+    
+    def __init__(self, model):
+        self.model = model
 
  
-    def get_params(self, layer_name=""):
-        '''Get the model parameters by name.
-
-          Args:
-              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings. 
-               If an empty string is given, it matches all the layers. 
-                          
-          Examples:
-              trainer.get_params("fc")
-              trainer.get_params(("encoder", "decoder"))
-        '''
-
+    def _get_params(self, layer_name=""):
         for name, param in self.model.named_parameters():
             if name.startswith(layer_name):
                 yield param
 
     def _set_requires_grad(self, req_grad, layer_name=""):
-        for param in self.get_params(layer_name):
+        for param in self._get_params(layer_name):
             param.requires_grad = req_grad
 
     def freeze(self, layer_name=""):
-        '''Freeze a number of layers based on their name'''
+        '''Freeze a number of layers based on their name. If no name is provided, it will freeze
+           all layers.
+        
+           Args:
+              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings. 
+              
+        '''
         
         self._set_requires_grad(False, layer_name)
 
     def unfreeze(self, layer_name=""):
-        '''Freeze a number of layers based on their name'''
+        '''Unfreeze a number of layers based on their name. If no name is provided, it will unfreeze
+           all layers.
+        
+           Args:
+              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings. 
+        '''
         
         self._set_requires_grad(True, layer_name)
 
-    def summary_param(self):
-        '''Print an overview of the parameters defined
-           and their status.
+    def summary(self):
+        '''Print an overview of the parameters and their status.
         '''
         for idx, (name, layer) in enumerate(self.model.named_parameters()):
             text = "[unfrozen]" if layer.requires_grad else "[frozen]"
@@ -173,7 +180,7 @@ class Trainer():
     def __init__(self, model, optim, meter=None, metrics={}, mover=None):
         self.model = model
         self.optim = optim
-        self.metrics =  metrics
+        self.metrics = metrics
         self.epoch = 0
         self.id = str(int(time.time()))
         self.mover = Mover.get_default(model) if mover is None else mover
@@ -194,9 +201,9 @@ class Trainer():
         self.meter.display(ctx)
         
         
-    def handle_metrics(self):
-        '''call the configured model metrics and store the results
-           in model.output
+    def _handle_metrics(self):
+        '''call the configured metrics and update the meters 
+           accordingly.
         '''
         for key, fn in self.metrics.items():
             value = fn(self.model, self.optim)
@@ -204,30 +211,36 @@ class Trainer():
                 self.meter.update(key, value)
                             
     def train(self, data):
-        '''Train the model using the data provided'''
+        '''Train the model using the training data provided
+        
+           Args:
+               data: the training data to use.
+        '''
         
         self.model.train()
         with torch.set_grad_enabled(True):
             steps_per_epoch = len(data)
-            for idx, (x,t) in enumerate(self.mover(data)):
+            for idx, (x, t) in enumerate(self.mover(data)):
                 output = self.model.learn(x, t, self.optim)
                 self._update_meter(output)
-                self.handle_metrics()
+                self._handle_metrics()
                 self.optim.step()
                 self.optim.zero_grad()
-                progress= (1. + idx)/steps_per_epoch
+                progress = (1. + idx)/steps_per_epoch
                 self._display_meter("train", progress)
         
                 
     def validate(self, data):
-        '''Validate/evaluate the model using 
-           the data provided
+        '''Validate/evaluate the model using the data provided
+        
+            Args:
+               data: the validation data to use.
         '''
         
         self.model.eval()
         with torch.set_grad_enabled(False):
-            for x,t in self.mover(data):
-                output = self.model.validate(x,t)
+            for x, t in self.mover(data):
+                output = self.model.validate(x, t)
                 self._update_meter(output, "val_")
             self._display_meter("valid")
  
@@ -235,6 +248,13 @@ class Trainer():
         '''Predict the outcome given the provided input data.
            Data is expected to be an iterable, like for example a
            dataloader or a numpy array.
+           
+           Args:
+               data: the input data to use
+               
+           Note: since this method stores all the results before returning them,
+           this is not well suited for large number of big result tensors due to 
+           memory usage.
         '''
         result = []
         
@@ -253,11 +273,11 @@ class Trainer():
            the validaiton should not run every epoch, check the Skipper class.
            
            Args:
-               data: the data used for training purpose.
-               valid_data: the data used for validation (default=None)
-               epochs (int): the number of epochs to run the training (default=1)
+               data: the data to use for the training
+               valid_data: the data to use for the validation (default=None)
+               epochs (int): the number of epochs to run the training for (default=1)
         '''        
-        for epoch in range(epochs):
+        for _ in range(epochs):
             self.meter.reset()
             self.train(data)
             if valid_data is not None: 
@@ -321,7 +341,7 @@ def _find_latest_training(root):
     try:
         d = sorted(os.listdir(root))[-1]
         f = sorted(os.listdir(root+d))[-1]
-        return os.path.join(root,d,f)
+        return os.path.join(root, d, f)
     except:
-        print("Couldn't find previously saved training files at directory ",root)
+        print("Couldn't find previously saved training files at directory ", root)
         return None
