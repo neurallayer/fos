@@ -51,10 +51,10 @@ def test_supermodel_metrics():
     assert model.step == 0
     
     data = get_data(1)[0]
-    y = model.validate(*data)
-    assert "val_" + metric_name in model.output
-    assert "loss" not in model.output
-    assert model.output["val_" + metric_name] == 1. 
+    output = model.validate(*data)
+    assert metric_name in output
+    assert "loss" in output
+    assert output[metric_name] == 1. 
     
     
     
@@ -69,13 +69,10 @@ def test_supermodel_train():
     assert model.step == 0
     
     x, t = get_data(1)[0]
-    loss = model.learn(x, t, optim)
-    assert loss is not None
-    assert "loss" in model.output
-    assert metric_name in model.output
-    assert "val_loss" not in model.output
+    output = model.learn(x, t, optim)
+    assert "loss" in output
+    assert metric_name in output
     assert model.step == 1
     
-    loss2 = model.learn(x, t, optim)
-    assert loss2 != loss
+    output2 = model.learn(x, t, optim)
     assert model.step == 2

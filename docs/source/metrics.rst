@@ -1,8 +1,8 @@
 Metrics
 =======
 Metrics are a great way to get extra information about the performance of the model besides the loss. Metrics are plain 
-Python functions that can be passed as an argument when you create the SuperModel. You pass them as a dictionary o which 
-the key is name under which the metric wil be known and the value is the metric function iself. For example::
+Python functions that can be passed as an argument when you create the SuperModel or Trainer. You pass them as a dictionary 
+of which the key is name under which the metric wil be known and the value is the metric function iself. For example::
 
     SuperModel(..., metrics={"acc": accuracy})
 
@@ -14,7 +14,7 @@ There are two different types of metrics that are being supported by Fos:
         def metric(y: Tensor, t:Tensor):
             ...
     
-   The prediction metrics will be calculated both during the training and validation iterations. The values are stored in the output attribute of the SuperModel, with the difference that the metric of the validation iteration is prepended with "val\_". 
+   The prediction metrics will be calculated both during the training and validation iterations.  
     
 2. Model Metrics. Model metrics provide insights into the model itself and are only called during training::
 
@@ -40,11 +40,11 @@ The followig snippet shows how to implement a simple accuracy metric (predection
 
 And an example of a model metric::
 
-    def fc_metric(model):
+    def fc_metric(model, optim):
         # Returns the avg weight of the fully connected layer 
         return model.predictor.fc.weight.avg().item()
         
-    model = Supermodel(predictor, optim, model_metrics={"fcweight": fc_metric})
+    trainer = Trainer(model, optim, model_metrics={"fcweight": fc_metric})
 
 
 Classes

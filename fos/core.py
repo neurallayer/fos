@@ -16,21 +16,19 @@ class SuperModel(nn.Module):
            predictor (nn.Module): The model that needs to be trained. 
            loss_fn (function): The loss function (objective) that should be used to train the model
            metrics (dict): The metrics that should be generated during the training and validation
-           model_metrics (dict): The model metrics (like gradients) that should be generated 
-             during training (model metrics are not applied during the validation phase)
+
             
     '''
     
-    def __init__(self, predictor, loss_fn, metrics={}, model_metrics={}):
+    def __init__(self, predictor, loss_fn, metrics={}):
         super().__init__()
         self.predictor = predictor
         self.metrics = metrics
-        self.model_metrics = model_metrics
         self.loss_fn = loss_fn
         self.step = 0
         self.output = {}
     
-    def handle_metrics(self, loss, y, t, prefix=""):
+    def handle_metrics(self, loss, y, t):
         '''call the configured prediction metrics and store the results
            in self.output
         
@@ -38,23 +36,16 @@ class SuperModel(nn.Module):
                loss (scaler): the loss value
                y (Tensor): the predicted value
                t (Tensor): the target value
-               prefix (str): prefix to use when storing outcome
         '''
-        self.output[prefix + "loss"] = loss
+        output = {}
+        
+        output["loss"] = loss
         for key, fn in self.metrics.items():
             value = fn(y,t)
             if value is not None:
-                name = prefix + key
-                self.output[name] = fn(y,t) 
-        
-    def handle_model_metrics(self, optim):
-        '''call the configured model metrics and store the results
-           in model.output
-        '''
-        for key, fn in self.model_metrics.items():
-            value = fn(self, optim)
-            if value is not None: self.output[key] = value 
-        
+                output[key] = value 
+        return output
+       
     def forward(self, x, t):
         '''Implementation of the forward method in nn.Module
         
@@ -85,8 +76,7 @@ class SuperModel(nn.Module):
                t (Tensor): the target tensor
         '''
         loss, y = self(x,t)
-        self.handle_metrics(loss.item(), y, t, "val_")
-        return loss
+        return self.handle_metrics(loss.item(), y, t)
            
     def learn(self, x, t, optim):
         '''Perform a single learning step. This method is normally invoked by 
@@ -101,12 +91,9 @@ class SuperModel(nn.Module):
         self.output = {}
         self.step += 1
         loss, y = self(x,t)
-        self.handle_metrics(loss.item(), y,t)
         loss.backward()
-        self.handle_model_metrics(optim)
-        optim.step()
-        optim.zero_grad()
-        return loss
+        return self.handle_metrics(loss.item(), y,t)
+    
  
     def state_dict(self):
         return {
@@ -175,25 +162,27 @@ class Trainer():
     
        Args:
            model (SuperModel): the supervised model that will be trained
-           optim (optim.Optimizer): the optimizer to use
+           optim (Optimizer): the optimizer to use
            meter (Meter): what meter should be used to handle and diplsay the various metrics
+           metrics (dict): The model metrics (like gradients) that should be generated 
+             during training (model metrics are not applied during the validation phase)
            mover: the mover to use. If None is specified, a default mover will be used to move tensors to
-             the correct device.
-           auto_save (bool): should the model be saved after each epoch, default False.
+             the correct device
     '''
     
-    def __init__(self, model:SuperModel, optim:torch.optim.Optimizer, meter=None, mover=None):
+    def __init__(self, model, optim, meter=None, metrics={}, mover=None):
         self.model = model
         self.optim = optim
+        self.metrics =  metrics
         self.epoch = 0
         self.id = str(int(time.time()))
         self.mover = Mover.get_default(model) if mover is None else mover
         self.meter = meter
        
                
-    def _update_meter(self, output:dict):
+    def _update_meter(self, output, prefix=""):
         for key, value in output.items():
-            self.meter.update(key, value)
+            self.meter.update(prefix + key, value)
               
     def _display_meter(self, phase, progress=None):
         ctx = {
@@ -203,7 +192,17 @@ class Trainer():
             "progress": progress
         }
         self.meter.display(ctx)
-            
+        
+        
+    def handle_metrics(self):
+        '''call the configured model metrics and store the results
+           in model.output
+        '''
+        for key, fn in self.metrics.items():
+            value = fn(self.model, self.optim)
+            if value is not None: 
+                self.meter.update(key, value)
+                            
     def train(self, data):
         '''Train the model using the data provided'''
         
@@ -211,8 +210,11 @@ class Trainer():
         with torch.set_grad_enabled(True):
             steps_per_epoch = len(data)
             for idx, (x,t) in enumerate(self.mover(data)):
-                self.model.learn(x, t, self.optim)
-                self._update_meter(self.model.output)
+                output = self.model.learn(x, t, self.optim)
+                self._update_meter(output)
+                self.handle_metrics()
+                self.optim.step()
+                self.optim.zero_grad()
                 progress= (1. + idx)/steps_per_epoch
                 self._display_meter("train", progress)
         
@@ -225,8 +227,8 @@ class Trainer():
         self.model.eval()
         with torch.set_grad_enabled(False):
             for x,t in self.mover(data):
-                self.model.validate(x,t)
-                self._update_meter(self.model.output)
+                output = self.model.validate(x,t)
+                self._update_meter(output, "val_")
             self._display_meter("valid")
  
     def predict(self, data):

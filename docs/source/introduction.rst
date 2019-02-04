@@ -57,6 +57,7 @@ Then we create the model we want to train, an optimizer and the loss function::
    loss      = F.binary_cross_entropy_with_logits
 
 Finally we create the supermodel, a meter and the trainer::
+
    model   = SuperModel(predictor, loss)
    meter   = NotebookMeter()
    trainer = Trainer(model, optim, meter)
@@ -101,13 +102,13 @@ supermodel_
 
 Metric
 ------
-A metric is nothing more then a plain Python function that can be added to a SuperModel to get extra insights into
+A metric is nothing more then a plain Python function that can be added to a SuperModel or a Trainer to get extra insights into
 the performance of your model. There are two types of metrics support:
 
-1) metrics that evaluate the prediction vs target values. 
-2) metrics that evaluate the model itself. 
+1) Metrics that evaluate the prediction vs target values. These can be passed as an argument when you create a SuperModel. 
+2) metrics that evaluate the model itself. These can be passed as an argument when you create a Trainer.
 
-Metrics are optional and if you don't provide any, only the loss function will be calculated.
+Metrics are optional and if you don't provide any, only the loss value will be added as a metric.
 
 Meter
 -----
@@ -116,15 +117,12 @@ logging them to a file. Whenever the trainer is done with a training step, it wi
 over to the meter (meter.update).
 
 
-
 Read more about meters (and calcuators) at meters.rst
 
 Trainer
 -------
 The trainer is the coponent that glues all other components together and responsible for running the training epochs. 
 The trainer contains the loops that go over the provided data (trainer.run). 
-
-Note: the actual updating of the model is done by the SuperModel (following OO encapsulating principle).
 
 To initiate a trainer you need to provide at least a supermodel, optimizer and meter::
 
@@ -159,9 +157,10 @@ Fos tries to use the below terminology concise througout the documentation and s
   
 - predictor: the model that you want to train and is wrapped in the SuperModel.
 
-- supermodel: short for supervised model and an subclass nn.Modue that adds a loss function to the predictor 
+- supermodel: short for supervised model and an subclass nn.Modue that adds a loss function to the predictor
+  and performs a backward pass.
 
-- trainer: responsible for training the model by iterating over a provided datasets.
+- trainer: responsible for training the model by iterating over a provided datasets and update the model.
 
 - metrics: a function or method that provides additional insights into the performance of the predictions 
   or model.
