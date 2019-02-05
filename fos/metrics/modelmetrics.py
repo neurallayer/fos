@@ -1,4 +1,13 @@
+import numpy as np
 from tensorboardX import SummaryWriter
+
+def basic_model_metrics(model):
+    std = []
+    for param in model.parameters(): 
+        std.append(param.data.std().item())
+       
+    return np.array(std)
+
 
 class ParamHistogram():
     '''Make histograms of the weights and gradients of 
@@ -32,7 +41,7 @@ class ParamHistogram():
         self.writer = writer
         self.prefix = prefix
         self.predictor_only = predictor_only
-        self.skip  = skip
+        self.skip = skip
         self.include_gradient = include_gradient
         self.include_weight = include_weight
                 
@@ -46,7 +55,8 @@ class ParamHistogram():
         
     def __call__(self, model, optim):
         
-        if (model.step % self.skip) != 0: return
+        if (model.step % self.skip) != 0: 
+            return
         
         supermodel = model
         
@@ -59,7 +69,7 @@ class ParamHistogram():
                 name = "weight/" + k
                 self._write(name, v.data, supermodel.step)
             
-            if self.include_gradient and hasattr(v,"grad"):
+            if self.include_gradient and hasattr(v, "grad"):
                 name = "gradient/" + k
                 self._write(name, v.grad, supermodel.step)
                             
@@ -68,7 +78,7 @@ class ParamHistogram():
     def _write(self, name, value, step):
         # try:
         value = self._get_np(value)
-        name  = self.prefix + name
+        name = self.prefix + name
         self.writer.add_histogram(name, value, step)
         #except:
         #    pass

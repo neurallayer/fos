@@ -69,10 +69,10 @@ def test_supermodel_train():
     assert model.step == 0
     
     x, t = get_data(1)[0]
-    output = model.learn(x, t, optim)
+    output = model.learn(x, t)
     assert "loss" in output
     assert metric_name in output
     assert model.step == 1
     
-    output2 = model.learn(x, t, optim)
+    output2 = model.learn(x, t)
     assert model.step == 2

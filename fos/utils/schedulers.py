@@ -1,6 +1,5 @@
-from torch.optim.lr_scheduler import _LRScheduler
 import math
-
+from torch.optim.lr_scheduler import _LRScheduler
 
 class CosineAnnealingRestartsLR(_LRScheduler):
     r"""Set the learning rate of each parameter group using a cosine annealing

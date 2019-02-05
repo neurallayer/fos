@@ -1,11 +1,10 @@
-import torch
 import time
 import os
-import torch.nn as nn
-from torch import Tensor
 import numpy as np
-
+import torch
+import torch.nn as nn
 from .utils import Mover
+
 
 class SuperModel(nn.Module):
     '''SuperModel is short for `SupervisedModel` and extends a regular model 
@@ -76,7 +75,7 @@ class SuperModel(nn.Module):
         loss, y = self(x, t)
         return self.handle_metrics(loss.item(), y, t)
            
-    def learn(self, x, t, optim):
+    def learn(self, x, t):
         '''Perform a single learning step. This method is normally invoked by 
            the trainer but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
@@ -88,7 +87,6 @@ class SuperModel(nn.Module):
                optim (Optimizer): the optimizer to use to update the model
              
         '''
-        self.output = {}
         self.step += 1
         loss, y = self(x, t)
         loss.backward()
@@ -221,7 +219,7 @@ class Trainer():
         with torch.set_grad_enabled(True):
             steps_per_epoch = len(data)
             for idx, (x, t) in enumerate(self.mover(data)):
-                output = self.model.learn(x, t, self.optim)
+                output = self.model.learn(x, t)
                 self._update_meter(output)
                 self._handle_metrics()
                 self.optim.step()
@@ -313,8 +311,9 @@ class Trainer():
         
         if filename is None:
             subdir = "./models/{}/".format(self.id)
-            if not os.path.exists(subdir): os.makedirs(subdir)
-            filename = subdir + "trainer_{:08d}.pty".format(self.model.step)
+            if not os.path.exists(subdir): 
+                os.makedirs(subdir)
+            filename = "{}trainer_{:08d}.pty".format(subdir, self.model.step)
         torch.save(self.state_dict(), filename)
         
     def load(self, filename=None):

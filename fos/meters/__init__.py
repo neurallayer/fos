@@ -2,6 +2,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 from collections import OrderedDict 
+from abc import abstractmethod
 
 from ..calc import AvgCalc
 
@@ -11,17 +12,17 @@ class Meter():
        look at the BaseMeter class.
     '''
    
+    @abstractmethod
     def reset(self):
         '''reset the state kept by the meter'''
-        ...
 
+    @abstractmethod
     def update(self, key, value):
         '''update the state of the meter'''
-        ...
         
+    @abstractmethod
     def display(self, ctx):
         '''display the values of the meter'''
-        ...
         
         
 class MultiMeter(Meter):
@@ -148,7 +149,7 @@ class PrintMeter(BaseMeter):
         super().reset()
         self.next = -1
     
-    def format(self, key:str, value):
+    def format(self, key, value):
         try:
             value = float(value)
             result = "{}={:.6f} ".format(key, value)
@@ -250,7 +251,7 @@ class BaseMeter2(Meter):
         
         return None
             
-    def update(self, key:str, value):
+    def update(self, key, value):
         calc = self.get_calc(key)
         if calc is not None:
             calc.add(value)

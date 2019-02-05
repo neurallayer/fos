@@ -4,7 +4,6 @@ import torchvision
 import numpy as np
 
 
-
 class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the same device as 
@@ -45,6 +44,7 @@ class Mover():
         
         print("This mover doesn't support batch of type ", type(batch))
         print("Supported types: tuples, tensors and numpy arrays")
+        return batch
                 
     def __call__(self, data): 
         for batch in data:
@@ -80,7 +80,7 @@ class BaseDataset(torch.utils.data.Dataset):
     '''
 
     def __init__(self, transform=None, transform_y=None):
-        self.transform   = transform
+        self.transform = transform
         self.transform_y = transform_y
 
     @abstractmethod
@@ -88,13 +88,13 @@ class BaseDataset(torch.utils.data.Dataset):
         ...
 
     def __getitem__(self, idx):
-        id = self.get_id(idx)
+        i = self.get_id(idx)
 
-        x = self.get_x(id)
+        x = self.get_x(i)
         if self.transform is not None:
             x = self.transform(x)
 
-        y = self.get_y(id)
+        y = self.get_y(i)
         if self.transform_y is not None:
             y = self.transform_y(y)
         
@@ -104,11 +104,11 @@ class BaseDataset(torch.utils.data.Dataset):
         return idx
 
     @abstractmethod
-    def get_x(self, id):
+    def get_x(self, identifier):
         ...
 
     @abstractmethod
-    def get_y(self, id):
+    def get_y(self, identifier):
         ...
         
 
@@ -179,7 +179,7 @@ class SmartOptimizer(torch.optim.Optimizer):
         self.optim.step()
         if self.scheduler is not None: self.scheduler.step()
         
-    def add_param_group(param_group):
+    def add_param_group(self, param_group):
         self.optim.add_param_group(param_group)
     
     def zero_grad(self):
@@ -219,10 +219,9 @@ class Skipper():
     
     def __len__(self):
         i = self._get_iter()
-        if hasattr(i,"__len__"):
+        if hasattr(i, "__len__"):
             return i.__len__()
-        else:
-            return 0
+        return 0
     
     def _get_iter(self):
         return self.dl.__iter__() if ((self.cnt % self.skip) == 0) else iter([])
