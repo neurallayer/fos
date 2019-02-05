@@ -1,29 +1,33 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import resnet18 
+from torchvision.models import resnet18
 
-from fos import SuperModel, Trainer, NotebookMeter
+from fos import SuperModel, Trainer, MemoryMeter
 
 
 def get_predictor():
     return nn.Sequential(
-            nn.Linear(10, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1))
+        nn.Linear(10, 32),
+        nn.ReLU(),
+        nn.Linear(32, 1))
+
 
 def get_data(steps):
-    return  [(torch.randn(16,10), torch.rand(16,1)) for i in range(steps)]
+    return [(torch.randn(16, 10), torch.rand(16, 1)) for i in range(steps)]
 
-    
+
 def test_trainer():
     predictor = get_predictor()
-    loss      = F.mse_loss
+    loss = F.mse_loss
+    optim = torch.optim.Adam(predictor.parameters())
     model = SuperModel(predictor, loss)
+    meter = MemoryMeter()
+    trainer = Trainer(model, optim, meter)
+
+    data = get_data(100)
+    trainer.run(data)
+    assert trainer.epoch == 1
     
-    assert model.step == 0
-    
-    data = get_data(1)[0]
-    y = model(*data)
-    y = model.validate(*data)
-    y = model.predict(data[0])
+    trainer.run(data, epochs=10)
+    assert trainer.epoch == 11

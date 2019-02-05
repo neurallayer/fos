@@ -131,7 +131,7 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
     """
 
     def __init__(self, data_source, num_samples=None, low_mem=False):
-        super().__init__()
+        # don't call super since it is a no-op
         self.data_source = data_source
         self.num_samples = num_samples
         self.low_mem = low_mem
