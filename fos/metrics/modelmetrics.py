@@ -1,5 +1,4 @@
 import numpy as np
-from tensorboardX import SummaryWriter
 
 
 def basic_model_metrics(model):
@@ -47,9 +46,9 @@ class ParamHistogram():
         self.include_gradient = include_gradient
         self.include_weight = include_weight
 
-    def set_writer(self, subdir, writer=None):
+    def set_writer(self, writer):
         '''Set the summary writer to use to output the metrics'''
-        self.writer = SummaryWriter("/tmp/runs/" + subdir)
+        self.writer = writer 
 
     @staticmethod
     def _get_np(param):

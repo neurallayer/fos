@@ -8,22 +8,64 @@ from ..calc import AvgCalc
 
 
 class Meter():
-    '''This is the meter interface that needs to be implemented
-       by any meter. For an example how to implement a custom meter,
-       look at the BaseMeter class.
+    '''This is the interface that needs to be implemented
+       by any meter.
+
+       The iteraction is as follows:
+
+            1. Whenever the trainer receives metrics from the model, it updates
+            the meter with the received metrics. So this is both during training
+            as well as validation after each iteration.
+
+            2. Whenever a step (= an iteration that updates the model) has finished,
+            the trainer will also call the display method to give the meter the opportunity to
+            display (or process in any other way) the metrics it has captured so far.
+            For the training phase this is once after every step, for the validaiton
+            only once per epoch since the step counter doesn't change during validation.
+
+       See also the BaseMeter that provides a sensible default implementation for many of
+       the methods defined in this interface.
     '''
 
     @abstractmethod
     def reset(self):
-        '''reset the state kept by the meter'''
+        '''Reset the state kept by the meter. If a meter uses calculators
+           it will typically also invoke calculator.clear() to ensure they
+           are also cleared.
+        '''
 
     @abstractmethod
     def update(self, key, value):
-        '''update the state of the meter'''
+        '''update the state of the meter with a certain metric
+
+           Args:
+               key (str): the name of the metric
+               valaue: the value of the metric
+        '''
 
     @abstractmethod
     def display(self, ctx):
-        '''display the values of the meter'''
+        '''display the values of the meter. Display can visual (to standard out or a notebook),
+           but also to a file or database.
+
+           Args:
+               ctx (dict): The context including values for steps and epochs.
+        '''
+
+    def state_dict(self):
+        '''get the internal state of the meter. The default implementation
+        assumes the meter is stateless.
+        '''
+        return None
+
+    def load_state_dict(self, state):
+        '''Load a previous state into the meter. Thedefault implementation
+        assumes the meter is stateless and ignores the state value.
+
+        Args:
+            state: the state to be loaded
+        '''
+        pass
 
 
 class MultiMeter(Meter):
@@ -60,33 +102,67 @@ class MultiMeter(Meter):
 
 class BaseMeter(Meter):
     '''Base meter that provides some sensible default implementations
-       for the various methods except the display method.
+       for the various methods except the display method. So a subclas only
+       has to implement the display method.
 
-       So many of the subclasses only have to implement the display method
+       Behaviour rules when creating an instance:
+           1. if nothing is specified, it will record all metrics using the average
+           calculator.
+
+            2. If only one or more exclude metrics are specifified, still record all metrics
+            except the one listed in the exclude argument.
+
+            3. If metrics are specified, only record those metrics and ignore other metrics.
+            The exclude argument is also ignored in this case.
+
+       Examples:
+           meter = some_meter()
+           meter = some_meter(metrics={"acc": MomentumMeter(), "val_acc": AvgMeter()})
+           meter = some_meter(exclude=["vall_loss"])
+
+       Args:
+           metrics (dict): the metrics and their calculators that should be
+               handled. If this argument is provided, metrics not mentioned
+               will be ignored by this meter. If no value is provided, the
+               meter will handle all the metrics.
+           exclude (list): list of metrics to ignore
     '''
 
-    def __init__(self, calculators=None):
-        self.calculators = calculators if calculators is not None else {}
-        self.updated = False
+    def __init__(self, metrics=None, exclude=None):
+        self.metrics = metrics if metrics is not None else OrderedDict()
+        self.exclude = exclude if exclude is not None else []
+        self.dynamic = True if metrics is None else False
+        self.updated = {}
+
+    def _get_calc(self, key):
+        if key in self.metrics:
+            return self.metrics[key]
+
+        if key in self.exclude:
+            return None
+
+        if self.dynamic:
+            self.metrics[key] = AvgCalc()
+            return self.metrics[key]
+
+        return None
 
     def update(self, key, value):
-        if key in self.calculators:
-            calc = self.calculators[key]
+        calc = self._get_calc(key)
+        if calc is not None:
             calc.add(value)
-            self.updated = True
+            self.updated[key] = True
 
     def reset(self):
-        for calculator in self.calculators.values():
+        for calculator in self.metrics.values():
             calculator.clear()
-        self.updated = False
-
-    @abstractmethod
-    def display(self, ctx):
-        ...
+        self.updated = {}
 
 
 class NotebookMeter(Meter):
-    '''Meter that display the progress in a Jupyter notebook.
+    '''Meter that displays the metrics and progress in
+       a Jupyter Notebook. This meter uses tqdm to display
+       the progress bar.
     '''
 
     def __init__(self):
@@ -144,9 +220,19 @@ class NotebookMeter(Meter):
 
 
 class PrintMeter(BaseMeter):
+    '''Displays the metrics by using a simple print
+       statement.
 
-    def __init__(self, calculators=None, throttle=3):
-        super().__init__(calculators)
+       If you use this is a shell script, please be aware that
+       by default Python buffers the output. You can change this
+       behaviour by using the `-u` option. See also:
+
+       `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
+
+    '''
+
+    def __init__(self, metrics=None, exclude=None, throttle=3):
+        super().__init__(metrics, exclude)
         self.throttle = throttle
         self.next = -1
 
@@ -154,7 +240,7 @@ class PrintMeter(BaseMeter):
         super().reset()
         self.next = -1
 
-    def format(self, key, value):
+    def _format(self, key, value):
         try:
             value = float(value)
             result = "{}={:.6f} ".format(key, value)
@@ -163,34 +249,40 @@ class PrintMeter(BaseMeter):
         return result
 
     def display(self, ctx):
-        if not self.updated:
-            return
         now = time.time()
         if now > self.next:
             result = "{}:[{:6}] => ".format(ctx["phase"], ctx["step"])
-            for key, calculator in self.calculators.items():
-                value = calculator.result()
-                if value is not None:
-                    result += self.format(key, value)
+            for key, calculator in self.metrics.items():
+                if key in self.updated:
+                    value = calculator.result()
+                    if value is not None:
+                        result += self._format(key, value)
             print(result)
+            self.updated = {}
             self.next = now + self.throttle
 
 
 class TensorBoardMeter(BaseMeter):
+    '''Log the metrics to a tensorboard file so they can be reviewed
+       in tensorboard.
+    '''
 
-    def __init__(self, calculators=None, writer=None, prefix=""):
-        super().__init__(calculators)
+    def __init__(self, writer=None, metrics=None, exclude=None, prefix=""):
+        super().__init__(metrics, exclude)
         self.writer = writer
         self.prefix = prefix
 
-    def set_writer(self, subdir):
-        self.writer = SummaryWriter("/tmp/runs/" + subdir)
+        
+    def set_writer(self, writer):
+        '''Set the writer to use for logging the metrics'''
+        self.writer = writer
 
-    def write(self, name, value, step):
-
+        
+    def _write(self, name, value, step):
+        
         if isinstance(value, dict):
             for k, v in value.items():
-                self.write(name + ":" + k, v, step)
+                self._write(name + ":" + k, v, step)
         else:
             try:
                 value = float(value)
@@ -199,13 +291,16 @@ class TensorBoardMeter(BaseMeter):
                 pass
 
     def display(self, ctx):
-        if not self.updated:
-            return
         for key, calculator in self.calculators.items():
-            value = calculator.result()
-            if value is not None:
-                full_name = self.prefix + key
-                self.write(full_name, value, ctx["step"])
+            if key in self.updated:
+                value = calculator.result()
+                if value is not None:
+                    full_name = self.prefix + key
+                    self._write(full_name, value, ctx["step"])
+        self.updated={}
+                
+
+
 
 
 class VisdomMeter(BaseMeter):
@@ -219,60 +314,16 @@ class VisdomMeter(BaseMeter):
         pass  # TODO
 
     def display(self, name, step):
-        if not self.updated:
-            return
         for key, calculator in self.calculators.items():
-            value = calculator.result()
-            if value is not None:
-                full_name = self.prefix + key
-                self.write(full_name, value, step)
-
-
-class BaseMeter2(Meter):
-    '''Base meter that provides some sensible default implementations
-       for the various methods except the display method.
-
-       So many of the subclasses only have to implement the display method.
-
-       Arguments:
-           metrics (dict): the metrics and their calculators that should be
-               handled. If this argument is provided, metrics not mentioned
-               will be ignored by this meter. If no value is provided, the
-               meter will handle all the metrics.
-
-    '''
-
-    def __init__(self, metrics=None):
-        self.metrics = metrics if metrics is not None else OrderedDict()
-        self.dynamic = True if metrics is None else False
+            if key in self.updated:
+                value = calculator.result()
+                if value is not None:
+                    full_name = self.prefix + key
+                    self.write(full_name, value, step)
         self.updated = {}
 
-    def get_calc(self, key):
-        if key in self.metrics:
-            return self.metrics[key]
 
-        if self.dynamic:
-            self.metrics[key] = AvgCalc()
-            return self.metrics[key]
-
-        return None
-
-    def update(self, key, value):
-        calc = self.get_calc(key)
-        if calc is not None:
-            calc.add(value)
-            self.updated[key] = True
-
-    def reset(self):
-        for calculator in self.metrics.values():
-            calculator.clear()
-        self.updated = {}
-
-    def display(self, ctx):
-        ...
-
-
-class MemoryMeter(BaseMeter2):
+class MemoryMeter(BaseMeter):
     '''Meter that stores values in memory for later use.
        With the get_history method the values for a metric
        can be retrieved.
@@ -286,10 +337,12 @@ class MemoryMeter(BaseMeter2):
         self.history = []
 
     def get_history(self, name, min_step=0):
-        '''Get the history for one of the metrics
+        '''Get the history for one of the stored metrics.
 
            Arguments:
                name: the name of the metric
+               min_step: the minimum step where to start collecting the
+                stored history.
         '''
         result = []
         steps = []
@@ -306,3 +359,9 @@ class MemoryMeter(BaseMeter2):
                 if value is not None:
                     self.history.append((ctx["step"], key, value))
         self.updated = {}
+
+    def state_dict(self):
+        return self.history
+
+    def load_state_dict(self, state):
+        self.history = state

@@ -280,14 +280,18 @@ class Trainer():
             "epoch": self.epoch,
             "id": self.id,
             "model": self.model.state_dict(),
+            "meter": self.meter.state_dict(),
             "optim": self.optim.state_dict()
         }
+
 
     def load_state_dict(self, state):
         self.epoch = state["epoch"]
         self.id = state["id"]
         self.model.load_state_dict(state["model"])
+        self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
+
 
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state

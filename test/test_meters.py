@@ -2,35 +2,52 @@
 from fos.meters import PrintMeter, NotebookMeter, MemoryMeter
 
 
+def init_meter(meter, steps):
+    for i in range(steps):
+        meter.update("loss", 1/(i+10))
+        meter.display({"phase":"train", "step": i+1, "epoch":1})
+    
+    
 def test_printmeter():
     meter = PrintMeter()
-    meter.update("loss", 0.5)
-    meter.update("loss", 0.6)
-    meter.update("loss", 0.7)
+    cnt = 10
+    init_meter(meter, cnt)   
 
 
 def test_notebookmeter():
     meter = NotebookMeter()
-    meter.update("loss", 0.5)
-    meter.update("loss", 0.6)
-    meter.update("loss", 0.7)
-
-
+    cnt = 10
+    # init_meter(meter, cnt)  
+    
+    
 def test_memorymeter():
     meter = MemoryMeter()
-    meter.update("loss", 0.5)
-    meter.display({"step": 1})
-    meter.update("loss", 0.6)
-    meter.display({"step": 2})
-    meter.update("loss", 0.7)
-    meter.display({"step": 3})
+    cnt = 10
+    init_meter(meter, cnt)
 
     assert "loss" in meter.metrics
     assert "val_loss" not in meter.metrics
 
     steps, values = meter.get_history("loss")
     assert len(steps) == len(values)
-    assert len(steps) == 3
+    assert len(steps) == cnt
 
     steps, values = meter.get_history("val_loss")
     assert len(steps) == 0
+    
+    meter.update("val_loss", 0.6)
+    meter.display({"step": 3}) 
+    steps, values = meter.get_history("val_loss")
+    assert len(steps) == 1
+    assert values[0] == 0.6
+    
+    state = meter.state_dict()
+    assert len(state) > 0
+    
+    meter.reset()
+    meter.load_state_dict(state)
+    steps, values = meter.get_history("loss")
+    assert len(steps) == len(values)
+    assert len(steps) == cnt
+
+    

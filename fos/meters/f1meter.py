@@ -13,7 +13,7 @@ class FScoreCalc:
     '''
 
     def __init__(self, threshold=0.5, beta=1, sigmoid=False, eps=1e-8):
-        self.reset()
+        self.clear()
         self.sigmoid = sigmoid
         self.beta = beta
         self.threshold = threshold

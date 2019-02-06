@@ -1,14 +1,16 @@
+from abc import abstractmethod
 import torch
 
 
 class BaseMacroCalculator():
     '''Base for other macro calculations. Should be used together with TPMetric
+       to get the correct metrics.
 
         Example:
-
-        model = SupervisedModel(... metric={"tp":TPMetrics})
-        meter = PrintMeter({"tp":PrecisionCalculator()})
-        trainer(.... meters=[meter])
+            metric = TPMetrics()
+            model  = SupervisedModel(..., metric={"tp":metric})
+            calc   = PrecisionCalculator()
+            meter  = PrintMeter({"tp":calc})
     '''
 
     def __init__(self, eps=1e-8):
@@ -29,8 +31,9 @@ class BaseMacroCalculator():
         self.fn += value["fn"]
         self.n += 1
 
+    @abstractmethod
     def result(self):
-        ...
+        '''Implement this is subclass'''
 
 
 class PrecisionCalculator(BaseMacroCalculator):
