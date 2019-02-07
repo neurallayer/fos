@@ -1,5 +1,7 @@
+from unittest.mock import Mock
+
 # The the standard meters that are being provided.
-from fos.meters import PrintMeter, NotebookMeter, MemoryMeter
+from fos.meters import PrintMeter, NotebookMeter, MemoryMeter, TensorBoardMeter
 
 
 def init_meter(meter, steps):
@@ -49,5 +51,25 @@ def test_memorymeter():
     steps, values = meter.get_history("loss")
     assert len(steps) == len(values)
     assert len(steps) == cnt
+
+    
+class Nop():
+    history = []
+    
+    def nop(self, *args, **kw):
+        self.history.append((args, kw))
+        
+    def __getattr__(self, _): return self.nop
+    
+    
+def test_tensorboardmeter():
+    writer = Mock()
+    meter = TensorBoardMeter(writer=writer)
+    init_meter(meter, 10)
+    writer.add_scalar.assert_called()
+    meter.reset()
+    assert meter.updated == {}
+    init_meter(meter, 10)
+    writer.add_scalar.assert_called()
 
     

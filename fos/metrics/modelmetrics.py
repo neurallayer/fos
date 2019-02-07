@@ -10,9 +10,12 @@ def basic_model_metrics(model):
 
 
 class ParamHistogram():
-    '''Make histograms of the weights and gradients of
-       the parameters in the model. Every layer will get its own histograms.
-       For example a Linear layer will get 4 histograms by default:
+    '''Make histograms of the weights and gradients of the parameters 
+       in the model. This metric writes directly to a tensorboard file and 
+       doesn't support Meters to perform that task. 
+       
+       Every layer will get its own histograms. For example a Linear 
+       layer will get 4 histograms by default:
 
        - 2 Histograms for the bias parameter (values + gradient)
        - 2 Histograms for the weight parameter (values + gradient)
@@ -27,12 +30,12 @@ class ParamHistogram():
 
        Arguments:
            writer: which Tensorboard writer to use, if none is speficied the default SummaryWriter is be used.
-           prefix: do you want to groep the metrics under a common "card" within tensorboard.
-           skip: how many steps to skip until the next histograms are generated. If
-           you run this metric every step it will slown down the training.
-           include_weight: Should it include the weights in the histograms
-           include_gradient: Should it include the gradients int the histograms
-           predictor_only: should it only assess the predictor model or the whole SupervisedModel,
+           prefix (str): do you want to groep the metrics under a common "card" within tensorboard.
+           skip (int): how many steps to skip until the next histograms are generated. If
+           you run this metric every step it will slown down the training. Default is 500
+           include_weight (bool): Should it include the weights in the histograms
+           include_gradient (bool): Should it include the gradients int the histograms
+           predictor_only (bool): should it only assess the predictor model or the whole SupervisedModel,
            so including the loss function. Mot of the time predictor_only is all that is required
            since loss functions don't have learnable parameters.
     '''
@@ -86,9 +89,18 @@ class ParamHistogram():
 
 
 def learning_rates(model, optim):
-    '''Get the learning rates used by the optimizer'''
+    '''Get the learning rates used by the optimizer. Comes in handy
+       if you use for example a scheduler and want to track how it 
+       changed the learning rate during the training.
+       
+       This metric supports optimizers with multiple parameter groups.
+    '''
 
     result = []
     for p in optim.param_groups:
         result.append(p["lr"])
-    return result
+    
+    if len(result) == 1:
+        return result[0]
+    else:
+        return np.array(result)

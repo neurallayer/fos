@@ -76,7 +76,7 @@ class MultiMeter(Meter):
            meters: the meters that should be wrapped
 
        Example:
-           meter = MultiMeter(NotebookMeter(), TBMeter())
+           meter = MultiMeter(NotebookMeter(), TensorBoardMeter())
            trainer = Trainer(model, optim, meter)
     '''
 
@@ -170,7 +170,7 @@ class NotebookMeter(Meter):
         self.reset()
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
 
-    def get_tqdm(self):
+    def _get_tqdm(self):
         if self.tqdm is None:
             self.tqdm = tqdm(
                 total=100,
@@ -207,7 +207,7 @@ class NotebookMeter(Meter):
             if value is not None:
                 result += self.format(key, value)
 
-        pb = self.get_tqdm()
+        pb = self._get_tqdm()
         progress = ctx["progress"]
         if progress is not None:
             rel_progress = int(progress * 100) - self.last
@@ -228,6 +228,9 @@ class PrintMeter(BaseMeter):
        behaviour by using the `-u` option. See also:
 
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
+       
+       Args:
+           throttle (int): how often to print output, default is oncr every 3 seconds.
 
     '''
 
@@ -264,7 +267,18 @@ class PrintMeter(BaseMeter):
 
 class TensorBoardMeter(BaseMeter):
     '''Log the metrics to a tensorboard file so they can be reviewed
-       in tensorboard.
+       in tensorboard. Currently supports the following format for metrics:
+       
+       * string, not a common use case. But you could use it to log some remarks::
+       
+               meter = TensorBoardMeter(metrics={"acc":AvgCalc(), "remark": RecentCalc()})
+               ...
+               meter.update("remark", "Some exception occured, not sure about impact")
+               
+       * dictionary of floats or strings. Every key in the dictionary will be 1 metric
+       * dist of float or strings. Every element in the list will be 1 metric
+       * float or values that convert to a float. This is the default if the other ones don't apply.
+         In case this fails, the meter ignores the exception and the metric will not be logged.
     '''
 
     def __init__(self, writer=None, metrics=None, exclude=None, prefix=""):
@@ -279,19 +293,28 @@ class TensorBoardMeter(BaseMeter):
 
         
     def _write(self, name, value, step):
-        
         if isinstance(value, dict):
             for k, v in value.items():
-                self._write(name + ":" + k, v, step)
-        else:
-            try:
-                value = float(value)
-                self.writer.add_scalar(name, value, step)
-            except BaseException:
-                pass
+                self._write(name + "/" + k, v, step)
+            return
+        
+        if isinstance(value, str):
+            self.writer.add_text(name, value, step)
+            return
+        
+        if isinstance(value, list):
+            for idx, v in enumerate(value):  
+                self._write(name + "/" + str(idx+1), v, step)
+            return
+        
+        try:
+            value = float(value)
+            self.writer.add_scalar(name, value, step)
+        except BaseException:
+            pass
 
     def display(self, ctx):
-        for key, calculator in self.calculators.items():
+        for key, calculator in self.metrics.items():
             if key in self.updated:
                 value = calculator.result()
                 if value is not None:
@@ -301,13 +324,11 @@ class TensorBoardMeter(BaseMeter):
                 
 
 
-
-
 class VisdomMeter(BaseMeter):
 
-    def __init__(self, calculators=None, vis=None, prefix=""):
-        super().__init__(calculators)
-        self.vis = visdom.Visdom() if vis is None else vis
+    def __init__(self, vis=None, metrics=None, exclude=None,  prefix=""):
+        super().__init__(metrics, exclude)
+        self.vis = vis
         self.prefix = prefix
 
     def write(self, name, value, step):
@@ -332,8 +353,8 @@ class MemoryMeter(BaseMeter):
        in order to avoid out of memory issues.
     '''
 
-    def __init__(self, metrics=None):
-        super().__init__(metrics)
+    def __init__(self, metrics=None, exclude=None):
+        super().__init__(metrics, exclude)
         self.history = []
 
     def get_history(self, name, min_step=0):
