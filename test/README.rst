@@ -1,6 +1,5 @@
 Usage
 =====
-
 This directory contains the unittests for *Fos*.
 Fos uses `PyTest` for unit testing. The below 
 code snippets assume you are in the Fos sourcecode 
@@ -13,8 +12,7 @@ the test directory::
    cd test
    pytest
 
-
-PyTest will automtically detect the unittest files and execute them all.If you didn't 
+PyTest will automtically detect the unittest files and execute them all. If you didn't 
 install Fos yet and only have the source code, you'll nee to add 
 the Fos root directory to the PYTHONPATH variable::
 
@@ -24,6 +22,5 @@ the Fos root directory to the PYTHONPATH variable::
 
 Structure
 =========
-
 Every main class/component has its own unittest file. Smaller classes are grouped
-into one unittest file (often my module name)
+into one unittest file (often by module name)

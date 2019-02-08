@@ -53,15 +53,6 @@ def test_memorymeter():
     assert len(steps) == cnt
 
     
-class Nop():
-    history = []
-    
-    def nop(self, *args, **kw):
-        self.history.append((args, kw))
-        
-    def __getattr__(self, _): return self.nop
-    
-    
 def test_tensorboardmeter():
     writer = Mock()
     meter = TensorBoardMeter(writer=writer)

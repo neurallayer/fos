@@ -10,11 +10,11 @@ def basic_model_metrics(model):
 
 
 class ParamHistogram():
-    '''Make histograms of the weights and gradients of the parameters 
-       in the model. This metric writes directly to a tensorboard file and 
-       doesn't support Meters to perform that task. 
-       
-       Every layer will get its own histograms. For example a Linear 
+    '''Make histograms of the weights and gradients of the parameters
+       in the model. This metric writes directly to a tensorboard file and
+       doesn't support Meters to perform that task.
+
+       Every layer will get its own histograms. For example a Linear
        layer will get 4 histograms by default:
 
        - 2 Histograms for the bias parameter (values + gradient)
@@ -51,7 +51,7 @@ class ParamHistogram():
 
     def set_writer(self, writer):
         '''Set the summary writer to use to output the metrics'''
-        self.writer = writer 
+        self.writer = writer
 
     @staticmethod
     def _get_np(param):
@@ -90,16 +90,16 @@ class ParamHistogram():
 
 def learning_rates(model, optim):
     '''Get the learning rates used by the optimizer. Comes in handy
-       if you use for example a scheduler and want to track how it 
+       if you use for example a scheduler and want to track how it
        changed the learning rate during the training.
-       
+
        This metric supports optimizers with multiple parameter groups.
     '''
 
     result = []
     for p in optim.param_groups:
         result.append(p["lr"])
-    
+
     if len(result) == 1:
         return result[0]
     else:

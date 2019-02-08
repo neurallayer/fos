@@ -228,7 +228,7 @@ class PrintMeter(BaseMeter):
        behaviour by using the `-u` option. See also:
 
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
-       
+
        Args:
            throttle (int): how often to print output, default is oncr every 3 seconds.
 
@@ -268,13 +268,13 @@ class PrintMeter(BaseMeter):
 class TensorBoardMeter(BaseMeter):
     '''Log the metrics to a tensorboard file so they can be reviewed
        in tensorboard. Currently supports the following format for metrics:
-       
+
        * string, not a common use case. But you could use it to log some remarks::
-       
+
                meter = TensorBoardMeter(metrics={"acc":AvgCalc(), "remark": RecentCalc()})
                ...
                meter.update("remark", "Some exception occured, not sure about impact")
-               
+
        * dictionary of floats or strings. Every key in the dictionary will be 1 metric
        * dist of float or strings. Every element in the list will be 1 metric
        * float or values that convert to a float. This is the default if the other ones don't apply.
@@ -286,27 +286,25 @@ class TensorBoardMeter(BaseMeter):
         self.writer = writer
         self.prefix = prefix
 
-        
     def set_writer(self, writer):
         '''Set the writer to use for logging the metrics'''
         self.writer = writer
 
-        
     def _write(self, name, value, step):
         if isinstance(value, dict):
             for k, v in value.items():
                 self._write(name + "/" + k, v, step)
             return
-        
+
         if isinstance(value, str):
             self.writer.add_text(name, value, step)
             return
-        
+
         if isinstance(value, list):
-            for idx, v in enumerate(value):  
-                self._write(name + "/" + str(idx+1), v, step)
+            for idx, v in enumerate(value):
+                self._write(name + "/" + str(idx + 1), v, step)
             return
-        
+
         try:
             value = float(value)
             self.writer.add_scalar(name, value, step)
@@ -320,13 +318,12 @@ class TensorBoardMeter(BaseMeter):
                 if value is not None:
                     full_name = self.prefix + key
                     self._write(full_name, value, ctx["step"])
-        self.updated={}
-                
+        self.updated = {}
 
 
 class VisdomMeter(BaseMeter):
 
-    def __init__(self, vis=None, metrics=None, exclude=None,  prefix=""):
+    def __init__(self, vis=None, metrics=None, exclude=None, prefix=""):
         super().__init__(metrics, exclude)
         self.vis = vis
         self.prefix = prefix
