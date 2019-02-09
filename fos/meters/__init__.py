@@ -101,18 +101,17 @@ class MultiMeter(Meter):
 
 
 class BaseMeter(Meter):
-    '''Base meter that provides some sensible default implementations
-       for the various methods except the display method. So a subclas only
-       has to implement the display method.
+    '''Base meter that provides a default implementation for the various methods except 
+       the display method. So a subclas has to implement the display method.
 
        Behaviour rules when creating an instance:
-           1. if nothing is specified, it will record all metrics using the average
+           1. If nothing is specified, it will record all metrics using the average
            calculator.
 
-            2. If only one or more exclude metrics are specifified, still record all metrics
-            except the one listed in the exclude argument.
+            2. If only one or more exclude metrics are specifified, it will record all 
+            metrics except the ones listed in the exclude argument.
 
-            3. If metrics are specified, only record those metrics and ignore other metrics.
+            3. If metrics are provided, only record those metrics and ignore other metrics.
             The exclude argument is also ignored in this case.
 
        Examples:
@@ -267,7 +266,7 @@ class PrintMeter(BaseMeter):
 
 class TensorBoardMeter(BaseMeter):
     '''Log the metrics to a tensorboard file so they can be reviewed
-       in tensorboard. Currently supports the following format for metrics:
+       in tensorboard. Currently supports the following type for metrics:
 
        * string, not a common use case. But you could use it to log some remarks::
 
@@ -279,6 +278,18 @@ class TensorBoardMeter(BaseMeter):
        * dist of float or strings. Every element in the list will be 1 metric
        * float or values that convert to a float. This is the default if the other ones don't apply.
          In case this fails, the meter ignores the exception and the metric will not be logged.
+         
+         
+      Args:
+          writer: the writer to use for logging
+          prefix: any prefix to add to the metric name. This allows for metrics to be 
+            grouped together in Tensorboard.
+            
+      Example:
+          writer = HistoryWriter("/tmp/runs/myrun")
+          metrics = {"loss":AvgCalc(), "val_loss":AvgCalc()}
+          meter = TensorBoardMeter(writer, metrics=metrics, prefix="metrics/")
+          ...
     '''
 
     def __init__(self, writer=None, metrics=None, exclude=None, prefix=""):
@@ -327,9 +338,16 @@ class VisdomMeter(BaseMeter):
         super().__init__(metrics, exclude)
         self.vis = vis
         self.prefix = prefix
-
-    def write(self, name, value, step):
-        pass  # TODO
+        self.graphs = {}
+        
+    def _write(self, name, value, step):
+        update='append'
+        if name not in self.graphs:
+            self.graphs = vis.line
+            
+        graph = self.graphs[name] 
+        graph(x=step, y=value, update=update)
+        
 
     def display(self, name, step):
         for key, calculator in self.calculators.items():
@@ -337,7 +355,7 @@ class VisdomMeter(BaseMeter):
                 value = calculator.result()
                 if value is not None:
                     full_name = self.prefix + key
-                    self.write(full_name, value, step)
+                    self._write(full_name, value, step)
         self.updated = {}
 
 

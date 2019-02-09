@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setuptools.setup(
     name="fos",
-    version="0.4.1",
+    version="0.4.2",
     author="Fos Authors",
     author_email="peter@jbaron.com",
     description="Deeplearning framework for PyTorch",
