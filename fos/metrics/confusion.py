@@ -1,4 +1,8 @@
 
+
+def _get_sum(tensor):
+    return tensor.float().sum(dim=0)
+
 class ConfusionMetric:
     '''Calculate the TP, FP, TN and FN for the predicted classes. 
        There are several calculators available that use these base metrics 
@@ -8,7 +12,7 @@ class ConfusionMetric:
            threshold: what threshold to use to say a probabity represents a true label 
            sigmoid: should a sigmoid be applied before determining true labels
            
-        Example:
+       Example:
             metric = ConfusionMetric(threshold=0.5, sigmoid=True)
             model  = SuperModel(..., metrics = {"tp": metric})
             meter  = TensorBoardMeter(metrics={"tp": RecallCalculator()})
@@ -17,7 +21,7 @@ class ConfusionMetric:
     def __init__(self, threshold=0., sigmoid=False):
         self.sigmoid = sigmoid
         self.threshold = threshold
-
+        
     def __call__(self, y, t):
 
         y = y.flatten(1)
@@ -31,14 +35,9 @@ class ConfusionMetric:
         y = (y > self.threshold).int().cpu()
         t = t.int().cpu()
 
-        tp = (y * t).float().sum(dim=0)
-        tn = ((1 - y) * (1 - t)).float().sum(dim=0)
-        fp = (y > t).float().sum(dim=0)
-        fn = (y < t).float().sum(dim=0)
-
         return {
-            "tp": tp,
-            "fp": fp,
-            "tn": tn,
-            "fn": fn
+            "tp": _get_sum(y * t),
+            "fp": _get_sum(y > t),
+            "fn": _get_sum(y < t),
+            "tn": _get_sum((1 - y) * (1 - t))
         }

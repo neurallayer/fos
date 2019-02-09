@@ -1,9 +1,22 @@
+'''
+The core module contains the basic functionality required to train a model. The only additional
+functionality you would normally include in your application is a `Meter` that will
+display the progress during the training.
+
+There are 3 classes in the core package:
+
+1) SuperModel, that creates a supervised model with a loss function
+2) Trainer, that will run the training including validation
+3) Mover, that will move tensors to a certain device like a GPU
+
+'''
+
 import time
 import os
 import numpy as np
 import torch
 import torch.nn as nn
-from .utils import Mover
+import logging
 
 
 class SuperModel(nn.Module):
@@ -24,45 +37,45 @@ class SuperModel(nn.Module):
         self.loss_fn = loss_fn
         self.step = 0
 
-    def handle_metrics(self, loss, y, t):
+    def handle_metrics(self, loss, input, target):
         '''Invoke the configured metrics functions return the result
 
            Args:
                loss (scaler): the loss value
                y (Tensor): the predicted value
-               t (Tensor): the target value
+               target (Tensor): the target value
         '''
         output = {}
 
         output["loss"] = loss
         for key, fn in self.metrics.items():
-            value = fn(y, t)
+            value = fn(input, target)
             if value is not None:
                 output[key] = value
         return output
 
-    def forward(self, x, t):
+    def forward(self, input, target):
         '''Implementation of the forward method in nn.Module
 
            Args:
                x (Tensor): the input data for the model
                t (Tensor): the target data for the loss function
         '''
-        y = self.predictor(x)
-        loss = self.loss_fn(y, t)
-        return loss, y
+        pred = self.predictor(input)
+        loss = self.loss_fn(pred, target)
+        return loss, pred
 
-    def predict(self, x):
+    def predict(self, input):
         '''Predict a single batch of data and return the result. No metrics
            will be generated when predicitng values.
 
            Args:
                x (Tensor): the input tensor
         '''
-        y = self.predictor(x)
-        return y
+        pred = self.predictor(input)
+        return pred
 
-    def validate(self, x, t):
+    def validate(self, input, target):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value.
@@ -71,10 +84,10 @@ class SuperModel(nn.Module):
                x (Tensor): the input tensor
                t (Tensor): the target tensor
         '''
-        loss, y = self(x, t)
-        return self.handle_metrics(loss.item(), y, t)
+        loss, pred = self(input, target)
+        return self.handle_metrics(loss.item(), pred, target)
 
-    def learn(self, x, t):
+    def learn(self, input, target):
         '''Perform a single learning step. This method is normally invoked by
            the trainer but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
@@ -87,9 +100,9 @@ class SuperModel(nn.Module):
 
         '''
         self.step += 1
-        loss, y = self(x, t)
+        loss, pred = self(input, target)
         loss.backward()
-        return self.handle_metrics(loss.item(), y, t)
+        return self.handle_metrics(loss.item(), pred, target)
 
     def state_dict(self):
         return {
@@ -102,75 +115,20 @@ class SuperModel(nn.Module):
         self.predictor.load_state_dict(state["predictor"])
 
 
-class Freezer():
-    '''Provides functionality to freeze/unfreeze parameters in a model based
-       on their name. This comes in most handy during transfer learning at
-       the beginning of the training you only want to train the newly added layers.
-
-       Args:
-           model (nn.Module): the model you want to use.
-
-       Examples:
-           freezer = Freezer(my_Model)
-           freezer.freeze() # freeze all layers
-           freezer.unfreeze("fc") # unfreeze last layer
-    '''
-
-    def __init__(self, model):
-        self.model = model
-
-    def _get_params(self, layer_name=""):
-        for name, param in self.model.named_parameters():
-            if name.startswith(layer_name):
-                yield param
-
-    def _set_requires_grad(self, req_grad, layer_name=""):
-        for param in self._get_params(layer_name):
-            param.requires_grad = req_grad
-
-    def freeze(self, layer_name=""):
-        '''Freeze a number of layers based on their name. If no name is provided, it will freeze
-           all layers.
-
-           Args:
-              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings.
-        '''
-
-        self._set_requires_grad(False, layer_name)
-
-    def unfreeze(self, layer_name=""):
-        '''Unfreeze a number of layers based on their name. If no name is provided, it will unfreeze
-           all layers.
-
-           Args:
-              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings.
-        '''
-
-        self._set_requires_grad(True, layer_name)
-
-    def summary(self):
-        '''Print an overview of the parameters and their status.
-        '''
-        for idx, (name, layer) in enumerate(self.model.named_parameters()):
-            text = "[unfrozen]" if layer.requires_grad else "[frozen]"
-            print("{:3} {:10} {:50} {}".format(
-                idx, text, name, tuple(layer.shape)))
-
-
 class Trainer():
     '''Train your supervised model using an optimizer.
 
        Args:
            model (SuperModel): the supervised model that will be trained
            optim (Optimizer): the optimizer to use
-           meter (Meter): what meter should be used to handle and diplsay the various metrics
+           meter (Meter): what meter should be used to handle and display the metrics
            metrics (dict): The model metrics (like gradients) that should be generated
-             during training (model metrics are not applied during the validation phase)
-           mover: the mover to use. If None is specified, a default mover will be used to move tensors to
-             the correct device
+            during training (model metrics are not applied during the validation phase)
+           mover: the mover to use. If None is specified, a default mover will be created to move
+            tensors to the correct device
     '''
 
-    def __init__(self, model, optim, meter=None, metrics=None, mover=None):
+    def __init__(self, model, optim, meter, metrics=None, mover=None):
         self.model = model
         self.optim = optim
         self.metrics = metrics if metrics is not None else {}
@@ -201,36 +159,47 @@ class Trainer():
             if value is not None:
                 self.meter.update(key, value)
 
+    def update_model(self):
+        '''Update the model. At this point the model has performed both the
+        forward and backward step. The default implementation invokes the
+        `optimizer.step` to perform the updates and afterwards reset the
+        gradients.
+        '''
+        self.optim.step()
+        self.optim.zero_grad()
+
     def train(self, data):
-        '''Train the model using the training data provided
+        '''Train the model using the training data provided. Typically you
+           would use `trainer.run` instead since that will also handle lifecycle
+           of meters.
 
            Args:
                data: the training data to use.
         '''
-
         self.model.train()
         with torch.set_grad_enabled(True):
             steps_per_epoch = len(data)
-            for idx, (x, t) in enumerate(self.mover(data)):
-                output = self.model.learn(x, t)
+            for idx, (input, target) in enumerate(self.mover(data)):
+                output = self.model.learn(input, target)
                 self._update_meter(output)
                 self._handle_metrics()
-                self.optim.step()
-                self.optim.zero_grad()
+                self.update_model()
                 progress = (1. + idx) / steps_per_epoch
                 self._display_meter("train", progress)
 
     def validate(self, data):
-        '''Validate/evaluate the model using the data provided
+        '''Validate the model using the data provided. Typically you
+           would use `trainer.run` instead since that will also handle lifecycle
+           of meters, unless you only want to run a vilidation cycle.
 
-            Args:
+           Args:
                data: the validation data to use.
         '''
 
         self.model.eval()
         with torch.set_grad_enabled(False):
-            for x, t in self.mover(data):
-                output = self.model.validate(x, t)
+            for input, target in self.mover(data):
+                output = self.model.validate(input, target)
                 self._update_meter(output, "val_")
             self._display_meter("valid")
 
@@ -250,21 +219,21 @@ class Trainer():
 
         self.model.eval()
         with torch.set_grad_enabled(False):
-            for x in self.mover(data):
-                y = self.model.predict(x)
-                result.extend(y.cpu().detach().numpy())
+            for input in self.mover(data):
+                pred = self.model.predict(input)
+                result.extend(pred.cpu().detach().numpy())
 
         return np.array(result)
 
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
-           If no validation data is provided, the validation is skipped. If
-           the validaiton should not run every epoch, check the Skipper class.
+           If no validation data is provided, the validation cycle is skipped. If
+           the validaiton should not run every epoch, check the `Skipper` class.
 
            Args:
                data: the data to use for the training
-               valid_data: the data to use for the validation (default=None)
-               epochs (int): the number of epochs to run the training for (default=1)
+               valid_data: the data to use for the validation, default = None.
+               epochs (int): the number of epochs to run the training for, default = 1
         '''
         for _ in range(epochs):
             self.meter.reset()
@@ -284,7 +253,6 @@ class Trainer():
             "optim": self.optim.state_dict()
         }
 
-
     def load_state_dict(self, state):
         self.epoch = state["epoch"]
         self.id = state["id"]
@@ -292,13 +260,20 @@ class Trainer():
         self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
 
-
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state
            but also the optimizer state and internal state. This makes it possible to
-           continue training where left off.
+           continue training where it was left off.
 
-           If no filename is provide, a directory and filename will be generated.
+           Please note::
+               This method doesn't store the model itself, just the trained paramters.
+               It is recommended to use regular version control like `git` to save
+               different versions of the code that creates the model.
+
+           If no filename is provide, a directory and filename will be generated using
+           the following pattern:
+
+                   `./models/[trainer.id]/trainer_[model.step].pty`
 
            Args:
                filename (str): the name of the file to store the training state.
@@ -312,11 +287,16 @@ class Trainer():
         torch.save(self.state_dict(), filename)
 
     def load(self, filename=None):
-        '''Restore previously stored training program. If no filename is provided
-           it will try to find the last stored training file and will use that one.
+        '''Restore previously stored training program.
+
+           If no filename is provided it will try to find the last stored training
+           file and will use that one. The algoritm assumed that directories
+           and files can be sorted based on its name to find the latest version. This is
+           true is you use the let Fos determine the filename, but might not be the case
+           if you provided your own filename during the `trainer.save` method.
 
            Args:
-               filename (str): The filename of th training programm to use.
+               filename (str): The filename of the training state to load.
         '''
 
         if filename is None:
@@ -336,5 +316,57 @@ def _find_latest_training(rootdir):
         filename = sorted(os.listdir(rootdir + subdir))[-1]
         return os.path.join(rootdir, subdir, filename)
     except BaseException:
-        print("Couldn't find previously saved training files at directory ", rootdir)
+        logging.warning(
+            "Couldn't find previously saved training files at directory %s",
+            rootdir)
         return None
+
+
+class Mover():
+    '''Moves tensors to a specific device. This is used to move
+       the input and target tensors to correct device and is used by the
+       trainer.
+
+       Args:
+           device: The device to move the tensors to
+           non_blocking: Use a non-blocking operation (asynchronous move), default = True
+
+       Example::
+           mover    = Mover("cuda")
+           trainer  = Trainer(..., mover=mover)
+    '''
+
+    def __init__(self, device, non_blocking=True):
+        self.device = device
+        self.non_blocking = non_blocking
+
+    @staticmethod
+    def get_default(model):
+        '''Get a mover based on the device on which the parameters of
+           the model resides. This method is also called by the trainer if
+           there is no mover provided as an argument when creating a new trainer
+        '''
+        device = next(model.parameters()).device
+        return Mover(device)
+
+    def move(self, batch):
+        '''Move a single batch to the device'''
+
+        if torch.is_tensor(batch):
+            return batch.to(device=self.device, non_blocking=self.non_blocking)
+
+        if isinstance(batch, (tuple, list)):
+            return tuple([self.move(elem) for elem in batch])
+
+        if isinstance(batch, np.ndarray):
+            batch = torch.from_numpy(batch)
+            return batch.to(device=self.device, non_blocking=self.non_blocking)
+
+        logging.warning(
+            "This mover doesn't support batch of type %s",
+            type(batch))
+        return batch
+
+    def __call__(self, data):
+        for batch in data:
+            yield self.move(batch)

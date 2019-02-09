@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 
 
@@ -80,13 +81,12 @@ class ParamHistogram():
         return None
 
     def _write(self, name, value, step):
-        # try:
-        value = self._get_np(value)
-        name = self.prefix + name
-        self.writer.add_histogram(name, value, step)
-        # except:
-        #    pass
-
+        try:
+            value = self._get_np(value)
+            name = self.prefix + name
+            self.writer.add_histogram(name, value, step)
+        except:
+            logging.warning("ignored metric %s", name)
 
 def learning_rates(model, optim):
     '''Get the learning rates used by the optimizer. Comes in handy

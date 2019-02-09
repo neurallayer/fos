@@ -1,11 +1,11 @@
 import time
+import logging
 from abc import abstractmethod
 from collections import OrderedDict
 import numpy as np
 from tqdm import tqdm
 
 from ..calc import AvgCalc
-
 
 class Meter():
     '''This is the interface that needs to be implemented
@@ -59,13 +59,13 @@ class Meter():
         return None
 
     def load_state_dict(self, state):
-        '''Load a previous state into the meter. Thedefault implementation
-        assumes the meter is stateless and ignores the state value.
+        '''Load a previous state into the meter. The default implementation
+        assumes the meter is stateless and just invokes reset.
 
         Args:
             state: the state to be loaded
         '''
-        pass
+        self.reset()
 
 
 class MultiMeter(Meter):
@@ -309,7 +309,7 @@ class TensorBoardMeter(BaseMeter):
             value = float(value)
             self.writer.add_scalar(name, value, step)
         except BaseException:
-            pass
+            logging.warning("ignoring metric %s", name)
 
     def display(self, ctx):
         for key, calculator in self.metrics.items():

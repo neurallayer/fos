@@ -2,53 +2,7 @@ from abc import abstractmethod
 import torch
 import torchvision
 import numpy as np
-
-
-class Mover():
-    '''Moves tensors to a specific device. This is used to move
-       the input and target tensors to the same device as
-       the model (often a GPU).
-
-       Arguments:
-           device: The device you want to move the tensors to
-           non_blocking: Should it try to use a non-blocking operation (asynchronous move)
-
-       Example:
-           mover = Mover("cuda")
-           for x,y in mover(dataloader):
-           ...
-    '''
-
-    def __init__(self, device, non_blocking=True):
-        self.device = device
-        self.non_blocking = non_blocking
-
-    @staticmethod
-    def get_default(model):
-        '''Get a mover based on the device on which the model resides.'''
-        device = next(model.parameters()).device
-        return Mover(device)
-
-    def move(self, batch):
-        '''Move a single batch to the device'''
-
-        if torch.is_tensor(batch):
-            return batch.to(device=self.device, non_blocking=self.non_blocking)
-
-        if isinstance(batch, (tuple, list)):
-            return tuple([self.move(elem) for elem in batch])
-
-        if isinstance(batch, np.ndarray):
-            batch = torch.from_numpy(batch)
-            return batch.to(device=self.device, non_blocking=self.non_blocking)
-
-        print("This mover doesn't support batch of type ", type(batch))
-        print("Supported types: tuples, tensors and numpy arrays")
-        return batch
-
-    def __call__(self, data):
-        for batch in data:
-            yield self.move(batch)
+import logging
 
 
 def get_clipping_class(optimClass, max_norm=1., norm_type=2):
@@ -91,15 +45,15 @@ class BaseDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         i = self.get_id(idx)
 
-        x = self.get_x(i)
+        input = self.get_x(i)
         if self.transform is not None:
-            x = self.transform(x)
+            input = self.transform(input)
 
-        y = self.get_y(i)
+        target = self.get_y(i)
         if self.transform_y is not None:
-            y = self.transform_y(y)
+            target = self.transform_y(target)
 
-        return x, y
+        return input, target
 
     def get_id(self, idx):
         '''default implementation just return the idx
@@ -210,8 +164,8 @@ class Skipper():
     want to execute the validation every epoch.
 
     Arguments:
-        dl: the dataloader (or otehr iterator) that needs to be wrapped
-        skips: how many epochs should be skipped. If skips is for example 3
+        dl: the dataloader (or another iterable) that needs to be wrapped
+        skip (int): how many epochs should be skipped. If skips is for example 3
         the iterator is only run at every third epcoh.
 
     Example:
@@ -238,3 +192,24 @@ class Skipper():
         i = self._get_iter()
         self.cnt += 1
         return i
+
+    
+def init_random(seed=0, cudnn=False):
+    '''Initialize the random seeds for `torch` and `numpy` in order to improve 
+       reproducability. This makes for example the initialization of 
+       weights in the different layers of the model reproducable.
+       
+       Example:
+           init_random()
+       
+       Args:
+           seed (int): the seed to use. default = 0
+           cudnn (bool): should we also disable some of the smart (non deterministic) 
+           optimimalizations of CuDNN. This might impact performance, so only recommended if 
+           really required. default = False
+    '''
+    torch.manual_seed(0)
+    np.random.seed(0)
+    if cudnn:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False

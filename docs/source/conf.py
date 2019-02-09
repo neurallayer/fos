@@ -73,7 +73,8 @@ language = None
 exclude_patterns = ['**.ipynb_checkpoints']
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = None
+pygments_style = 'friendly'
+autodoc_member_order = 'bysource'
 
 
 # -- Options for HTML output -------------------------------------------------

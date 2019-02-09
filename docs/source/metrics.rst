@@ -32,7 +32,7 @@ There are two different types of metrics that are being supported by Fos:
 
 
 Examples
-========
+--------
 
 The followig snippet shows how to implement an accuracy metric (of the type predection metric)::
 
@@ -53,4 +53,4 @@ And an example of a weight metric (of the type model metric)::
 
 
 Classes
-=======
+-------

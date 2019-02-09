@@ -1,10 +1,7 @@
 Meter & calculator
 ==================
-When you train a model, you'll need of course to see what is gong on. This is where the Meter kicks in. 
-Its main responsibility is to capture metrics and somehow display them. This can be printing them in 
-a ``Jupyter Notebook``, but also logging them to a ``tensorboard`` compatible file.
-
-There are sever al Meters provided out od the box that will get you started. 
+The meters main responsibility is to capture metrics and display them. Display can be printing them in 
+a ``Jupyter notebook``, but also logging them to a ``tensorboard`` file or storing them in a database.
 
 The Meter has to implement the following methods::
 
@@ -17,6 +14,17 @@ The Meter has to implement the following methods::
     def reset():
          ...
 
-Many of the out of the box meters delegate the actual calculations to a calculator. So for example the Notebook meter
-delegates the calculations of the average values to the AgvCalc.  
 
+There are several Meters provided out of the box that will get you started. Many of the out of the box meters delegate the actual calculations to a calculator. So for example the Notebook meter delegates by default the calculations of the values to the AgvCalc. 
+
+
+Examples
+--------
+    # capture all metrics and use the AvgCalc
+    meter = Notebookmeter()
+    
+    # capture only `acc` metric and use the MomentumCalc
+    meter = MemoryMeter(metrics={"acc": MomentumCalc()})
+    
+    # capture all metrics except `val_loss` and `loss` metrics
+    meter = PrintMeter(exclude=["val_loss", "loss"])

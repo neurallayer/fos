@@ -1,0 +1,54 @@
+
+class Freezer():
+    '''Provides functionality to freeze/unfreeze parameters in a model based
+       on their name. This comes in most handy during transfer learning at
+       the beginning of the training you only want to train the newly added layers.
+
+       Args:
+           model (nn.Module): the model you want to use.
+
+       Examples:
+           freezer = Freezer(my_Model)
+           freezer.freeze() # freeze all layers
+           freezer.unfreeze("fc") # unfreeze last layer
+    '''
+
+    def __init__(self, model):
+        self.model = model
+
+    def _get_params(self, layer_name=""):
+        for name, param in self.model.named_parameters():
+            if name.startswith(layer_name):
+                yield param
+
+    def _set_requires_grad(self, req_grad, layer_name=""):
+        for param in self._get_params(layer_name):
+            param.requires_grad = req_grad
+
+    def freeze(self, layer_name=""):
+        '''Freeze a number of layers based on their name. If no name is provided, it will freeze
+           all layers.
+
+           Args:
+              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings.
+        '''
+
+        self._set_requires_grad(False, layer_name)
+
+    def unfreeze(self, layer_name=""):
+        '''Unfreeze a number of layers based on their name. If no name is provided, it will unfreeze
+           all layers.
+
+           Args:
+              layer_name (str): The first part of the layer_name. Can be a single string or a set of strings.
+        '''
+
+        self._set_requires_grad(True, layer_name)
+
+    def summary(self):
+        '''Print an overview of the parameters and their status.
+        '''
+        for idx, (name, layer) in enumerate(self.model.named_parameters()):
+            text = "[unfrozen]" if layer.requires_grad else "[frozen]"
+            print("{:3} {:10} {:50} {}".format(
+                idx, text, name, tuple(layer.shape)))
