@@ -20,19 +20,23 @@ import logging
 
 
 class Supervisor(nn.Module):
-    '''Supervisor extends a regular PyTorch model with a loss function. This class is extends from 
+    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from 
        `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
        not typical, it is possible to have multiple trainers train the same model.
        
        Besides the added loss function, also additional metrics can be specified to get insights into
-       the performance of model.
+       the performance of model. Normally you won't call a supervisor directly but rather interact with 
+       an instance of the Trainer_ class.
 
        Args:
            predictor (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
            metrics (dict): The metrics that should be evaluated during the training and validation
            
-       Example:
+       Example usage:
+       
+       .. code-block:: python
+
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
@@ -132,6 +136,15 @@ class Trainer():
             during training (model metrics are not applied during the validation phase)
            mover: the mover to use. If None is specified, a default mover will be created to move
             tensors to the correct device
+               
+       Example usage:
+
+       .. code-block:: python
+
+           trainer = Trainer(model, optim, meter)
+           trainer.run(data, epochs=10)
+           trainer.save()
+
     '''
 
     def __init__(self, model, optim, meter, metrics=None, mover=None):
@@ -165,7 +178,7 @@ class Trainer():
             if value is not None:
                 self.meter.update(key, value)
 
-    def update_model(self):
+    def _update_model(self):
         '''Update the model. At this point the model has performed both the
         forward and backward step. The default implementation invokes the
         `optimizer.step` to perform the updates and afterwards reset the
@@ -189,7 +202,7 @@ class Trainer():
                 output = self.model.learn(input, target)
                 self._update_meter(output)
                 self._handle_metrics()
-                self.update_model()
+                self._update_model()
                 progress = (1. + idx) / steps_per_epoch
                 self._display_meter("train", progress)
 
@@ -330,14 +343,18 @@ def _find_latest_training(rootdir):
 
 class Mover():
     '''Moves tensors to a specific device. This is used to move
-       the input and target tensors to correct device and is used by the
-       trainer.
+       the input and target tensors to the correct device. Normally
+       the default mover will be fine and you don't have to specify one when
+       you create the Trainer.
 
        Args:
            device: The device to move the tensors to
            non_blocking: Use a non-blocking operation (asynchronous move), default = True
 
-       Example::
+       Example usage:
+       
+       .. code-block:: python
+
            mover    = Mover("cuda")
            trainer  = Trainer(..., mover=mover)
     '''

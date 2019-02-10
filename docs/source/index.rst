@@ -5,7 +5,7 @@
 
 Fos Documentation
 =================
-Fos is a Python framework that makes it easier to develop neural network models 
+Fos is a Python framework that makes it easier to develop and test neural network models 
 in PyTorch.
 
 
@@ -19,18 +19,10 @@ in PyTorch.
    :maxdepth: 2
    :caption: Package Reference
 
-   supermodel
-   trainer
+   core
    metrics
    meter
-
-
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Modules
-
-   ./_modules/modules.rst
+   utils
 
 
 Indices and tables

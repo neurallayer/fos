@@ -34,13 +34,14 @@ helps to better understand how to use and extend Fos. The four main guiding prin
   .. image:: /_static/img/tensorboard_gradients.png
  
 
+
 * **Repeatable:** once you are developing models, it is important that you can easily repeat results and
   can continue where you left off. So Fos for example makes it easy to store and save the trianing state.
 
 
 Quick Start
 ===========
-The following code shows the steps required to train a model. In this example we'll use the resnet
+The following code shows the steps required to train a model. In this example we'll use the resnet18
 model that comes with PyTorch vision.
 
 First import the required modules, including the three classes from Fos we are going to use::
@@ -80,11 +81,10 @@ Components
 Supervisor
 ----------
 Supervisor is a model that adds a loss function to the model that you want to train.
-So you create an instance by providing both the model to train (we refer to this as the predictor) 
+So you create an instance by providing both the model you want to train (we refer to this as the predictor) 
 and the loss function::
 
     model = Supervisor(predictor, loss_fn)
-
 
 Under the hood, the forward of the supermodel would look something like this::
 
@@ -93,11 +93,11 @@ Under the hood, the forward of the supermodel would look something like this::
         loss   = loss_fn(y_pred, target)
         return loss
 
-The Supervisor has additional functionality to train and validate a batch and is used by the Trainer to train the model.
+The Supervisor has also additional methods to train and validate a batch and is used by the Trainer to train the model.
 It is the Supervisor responsibility to perform both the forward and backward step. And the Supervisor optionally invokes the additional metrics to get more insights how the model is performing. However is is the trainer that updates 
 the model by invoking `optimizer.step`.
 
-The provided Supervisor implementation can handle most scenario's, but you can alway extend it to 
+The provided Supervisor implementation can handle most scenarios, but you can alway extend it to 
 cather for specific use cases.
 
 Metric
@@ -143,31 +143,6 @@ The following diagram shows the interactin between the various components when y
 
 .. image:: /_static/img/logical_flow.png
 
-
-
-Glossary
-========
-Fos tries to use the below terminology concise througout the documentation and source code:
-
-- step: an single update of the parameters of a model, typically performed by calling `optimizer.step()`.
-  Please note that validation iterations don't add to the step counter since htey don't update the model.
-  
-- epoch: running once through the provided dataset. Typically running once through the iterator provided
-  by the PyTorch Dataloader, but can also iterate once over a simple Python list object for example. 
-  
-- predictor: the model that you want to train and is wrapped in the Supervisor.
-
-- supermodel: short for supervised model and an subclass nn.Modue that adds a loss function to the predictor
-  and performs a backward pass.
-
-- trainer: responsible for training the model by iterating over a provided datasets and update the model.
-
-- metrics: a function or method that provides additional insights into the performance of the predictions 
-  or model.
-  
-- calculator: a class that will receive metrics and based 
-
-- meter: a class that is responsible for processing and displaying metrics.
 
 Inspiration
 ===========

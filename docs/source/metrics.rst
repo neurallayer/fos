@@ -1,3 +1,5 @@
+.. currentmodule:: fos.metrics
+
 Metrics
 =======
 Metrics are the way to get extra information about the performance of the model besides the loss. Metrics are plain 
@@ -31,19 +33,42 @@ There are two different types of metrics that are being supported by Fos:
    Model metrics need to be passed as an argument to the Trainer.
 
 
-Examples
---------
+Prediction Metrics
+------------------
+Prediction metrics provide insights how the predictions are performing compared to the target values.
+A prediction metric is a plain Python function with the following signature::
 
-The followig snippet shows how to implement an accuracy metric (of the type predection metric)::
+      def metric(input: Tensor, target:Tensor):
+            ...
+
+So most lost functions that come with PyTorch can also double as a prediciton metric. The following snippet shows 
+how to implement a simple custom accuracy metric::
 
     def accuracy(y, t):
         y = torch.argmax(y, dim=-1)
         return (y == t).float().mean().item()
         
-    model = Supermodel(predictor, optim, metrics={"acc": accuracy})
+        
+To use a metric, it needs to be passed as an dictionary argument when creating a Supervisor::  
+        
+    model = Supervisor(predictor, optim, metrics={"acc": accuracy})
     
+The key of the dictionary ("acc") will be the name of the metric. When the metric is invoked during the validaiton phase it 
+will be prepended with `val_`. So after one step, the followig two metrics will be published: `acc` and 'val_acc'. 
 
-And an example of a weight metric (of the type model metric)::
+.. autoclass:: BinaryAccuracy
+
+.. autoclass:: ConfusionMetric
+
+
+Model Metrics
+-------------
+Model metrics dont evaluate prediction vs target but instead look at the model itself to determine 
+how the training is doing. Typically a model metric would look at weights and gradients of the 
+parameters in the model and provide some statistics that help to identify possible performance problems
+like vanishing gradients.
+
+An example of a model metric::
 
     def fc_metric(model, optim):
         # Returns the avg weight of the fully connected layer 
@@ -51,6 +76,5 @@ And an example of a weight metric (of the type model metric)::
         
     trainer = Trainer(model, optim, model_metrics={"fcweight": fc_metric})
 
+.. autoclass:: ParamHistogram
 
-Classes
--------

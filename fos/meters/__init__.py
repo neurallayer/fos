@@ -31,13 +31,13 @@ class Meter():
     @abstractmethod
     def reset(self):
         '''Reset the state kept by the meter. If a meter uses calculators
-           it will typically also invoke calculator.clear() to ensure they
+           the meter will typically also invoke calculator.clear() to ensure they
            are also cleared.
         '''
 
     @abstractmethod
     def update(self, key, value):
-        '''update the state of the meter with a certain metric
+        '''update the state of the meter with a certain metric and its value.
 
            Args:
                key (str): the name of the metric
@@ -76,8 +76,13 @@ class MultiMeter(Meter):
        Arguments:
            meters: the meters that should be wrapped
 
-       Example:
-           meter = MultiMeter(NotebookMeter(), TensorBoardMeter())
+       Example usage:
+       
+       .. code-block:: python
+       
+           meter1 = NotebookMeter()
+           meter2 = TensorBoardMeter()
+           meter = MultiMeter(meter1, meter2)
            trainer = Trainer(model, optim, meter)
     '''
 
@@ -127,17 +132,20 @@ class BaseMeter(Meter):
             3. If metrics are provided, only record those metrics and ignore other metrics.
             The exclude argument is also ignored in this case.
 
-       Examples:
-           meter = some_meter()
-           meter = some_meter(metrics={"acc": MomentumMeter(), "val_acc": AvgMeter()})
-           meter = some_meter(exclude=["vall_loss"])
-
        Args:
            metrics (dict): the metrics and their calculators that should be
                handled. If this argument is provided, metrics not mentioned
                will be ignored by this meter. If no value is provided, the
                meter will handle all the metrics.
            exclude (list): list of metrics to ignore
+
+       Example usage:
+       
+       .. code-block:: python
+       
+           meter = some_meter()
+           meter = some_meter(metrics={"acc": MomentumMeter(), "val_acc": AvgMeter()})
+           meter = some_meter(exclude=["vall_loss"])
     '''
 
     def __init__(self, metrics=None, exclude=None):
@@ -344,7 +352,10 @@ class TensorBoardMeter(BaseMeter):
           prefix: any prefix to add to the metric name. This allows for metrics to be 
             grouped together in Tensorboard.
             
-      Example:
+       Example usage:
+       
+       .. code-block:: python
+      
           writer = HistoryWriter("/tmp/runs/myrun")
           metrics = {"loss":AvgCalc(), "val_loss":AvgCalc()}
           meter = TensorBoardMeter(writer, metrics=metrics, prefix="metrics/")

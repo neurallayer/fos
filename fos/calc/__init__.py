@@ -1,4 +1,6 @@
 from abc import abstractmethod
+from .precision import *
+
 
 class Calculator():
     '''The base interface that every calculator needs to implement.
@@ -49,7 +51,7 @@ class MomentumCalc(Calculator):
        If it is called the first time it will use the provided
        value as initialization value:
 
-       value = new_value
+           value = new_value
 
        This is a memory efficient calculator, since only one value
        needs to be stored and it still achieves silimar results as a

@@ -17,7 +17,7 @@ api:
 	rm -rf ./source/_modules
 	sphinx-apidoc -o ./source/_modules ../fos
 
-html: clean api 
+# html: clean api 
 
 serve:
 	cd ./build/html

@@ -5,7 +5,10 @@ class BaseMacroCalculator():
     '''Base for other macro calculations. Should be used together with TPMetric
        to get the correct metrics.
 
-        Example:
+       Example usage:
+       
+       .. code-block:: python
+
             metric = TPMetrics()
             model  = SupervisedModel(..., metric={"tp":metric})
             calc   = PrecisionCalculator()
@@ -61,6 +64,9 @@ class RecallCalculator(BaseMacroCalculator):
 
 class BetaCalculator(BaseMacroCalculator):
     '''Calculates F Beta score, default is F1 (beta=1)
+    
+       Args:
+           beta: the beta to use, default = 1
     '''
 
     def __init__(self, beta=1, eps=1e-8):

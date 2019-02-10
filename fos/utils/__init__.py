@@ -150,7 +150,10 @@ class Skipper():
         skip (int): how many epochs should be skipped. If skips is for example 3
         the iterator is only run at every third epcoh.
 
-    Example:
+    Example usage:
+       
+    .. code-block:: python
+
         # Run the validation only every 5th epoch
         valid_data = Skipper(valid_data, 5)
         trainer.run(train_data, valid_data, 20)
@@ -178,17 +181,20 @@ class Skipper():
     
 def init_random(seed=0, cudnn=False):
     '''Initialize the random seeds for `torch` and `numpy` in order to improve 
-       reproducability. This makes for example the initialization of 
-       weights in the different layers of the model reproducable.
+    reproducability. This makes for example the initialization of 
+    weights in the different layers of the model reproducable.
        
-       Example:
-           init_random()
+     Example usage:
        
-       Args:
-           seed (int): the seed to use. default = 0
-           cudnn (bool): should we also disable some of the smart (non deterministic) 
-           optimimalizations of CuDNN. This might impact performance, so only recommended if 
-           really required. default = False
+     .. code-block:: python
+
+        init_random()
+       
+    Args:
+        seed (int): the seed to use. default = 0
+        cudnn (bool): should we also disable some of the smart (non deterministic) 
+        optimimalizations of CuDNN. This might impact performance, so only recommended if 
+        really required. default = False
     '''
     torch.manual_seed(0)
     np.random.seed(0)
