@@ -102,6 +102,15 @@ html_logo = '_static/img/fos_logo.png'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_context = {
+    'css_files': [
+        'https://fonts.googleapis.com/css?family=Roboto',
+        '_static/css/fos_theme.css'
+    ],
+}
+
+
+
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
 #

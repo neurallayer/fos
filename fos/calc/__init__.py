@@ -26,8 +26,6 @@ class Calculator():
 class RecentCalc(Calculator):
     '''Simple stores and returns the most recent value. So any new
        value added will overwrite the exisitng one.
-
-       This is proberly as simple as they get.
     '''
 
     def __init__(self):
@@ -54,7 +52,7 @@ class MomentumCalc(Calculator):
        value = new_value
 
        This is a memory efficient calculator, since only one value
-       needs to be stored and it still achieves silimar goals as a
+       needs to be stored and it still achieves silimar results as a
        moving average.
 
        Arguments:
@@ -83,7 +81,7 @@ class MomentumCalc(Calculator):
 
 class AvgCalc(Calculator):
     '''Calculates the average of the values.
-       Memory efficient, since no history needs to be stored.
+       Memory efficient, since no history is stored.
     '''
 
     def __init__(self):

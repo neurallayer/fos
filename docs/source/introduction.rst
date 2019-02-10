@@ -38,8 +38,8 @@ helps to better understand how to use and extend Fos. The four main guiding prin
   can continue where you left off. So Fos for example makes it easy to store and save the trianing state.
 
 
-Getting Started
-===============
+Quick Start
+===========
 The following code shows the steps required to train a model. In this example we'll use the resnet
 model that comes with PyTorch vision.
 

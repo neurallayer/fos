@@ -4,6 +4,7 @@ from abc import abstractmethod
 from collections import OrderedDict
 import numpy as np
 from tqdm import tqdm
+import logging
 
 from ..calc import AvgCalc
 
@@ -98,6 +99,18 @@ class MultiMeter(Meter):
     def display(self, ctx):
         for meter in self.meters:
             meter.display(ctx)
+            
+    def state_dict(self):
+        return [meter.state_dict() for meter in self.meters]
+
+    def load_state_dict(self, state):
+        if len(state) != len(self.meters):
+            logging.warning("Invalid state receive for MultiMeter, will reset only.")
+            self.reset()
+        else:
+            for meter_state, meter in zip(state, self.meters):
+                meter.load_state_dict(meter_state)
+            
 
 
 class BaseMeter(Meter):
@@ -160,7 +173,7 @@ class BaseMeter(Meter):
 
 class NotebookMeter(Meter):
     '''Meter that displays the metrics and progress in
-       a Jupyter Notebook. This meter uses tqdm to display
+       a Jupyter notebook. This meter uses tqdm to display
        the progress bar.
     '''
 
@@ -264,6 +277,52 @@ class PrintMeter(BaseMeter):
             self.next = now + self.throttle
 
 
+            
+
+class MemoryMeter(BaseMeter):
+    '''Meter that stores values in memory for later use.
+       With the get_history method the values for a metric
+       can be retrieved.
+
+       Since it stores everything in memory, this meter should be used 
+       with care in order to avoid memory issues.
+    '''
+
+    def __init__(self, metrics=None, exclude=None):
+        super().__init__(metrics, exclude)
+        self.history = []
+
+    def get_history(self, name, min_step=0):
+        '''Get the history for one of the stored metrics.
+
+           Arguments:
+               name: the name of the metric
+               min_step: the minimum step where to start collecting the
+                stored history.
+        '''
+        result = []
+        steps = []
+        for (step, key, value) in self.history:
+            if (step >= min_step) and (name == key) and (value is not None):
+                result.append(value)
+                steps.append(step)
+        return steps, result
+
+    def display(self, ctx):
+        for key, calculator in self.metrics.items():
+            if key in self.updated:
+                value = calculator.result()
+                if value is not None:
+                    self.history.append((ctx["step"], key, value))
+        self.updated = {}
+
+    def state_dict(self):
+        return self.history
+
+    def load_state_dict(self, state):
+        self.history = state
+
+
 class TensorBoardMeter(BaseMeter):
     '''Log the metrics to a tensorboard file so they can be reviewed
        in tensorboard. Currently supports the following type for metrics:
@@ -332,7 +391,13 @@ class TensorBoardMeter(BaseMeter):
         self.updated = {}
 
 
+
+
 class VisdomMeter(BaseMeter):
+    '''Visdom meter.
+    
+       TODO: currently not functional.
+    '''
 
     def __init__(self, vis=None, metrics=None, exclude=None, prefix=""):
         super().__init__(metrics, exclude)
@@ -357,47 +422,3 @@ class VisdomMeter(BaseMeter):
                     full_name = self.prefix + key
                     self._write(full_name, value, step)
         self.updated = {}
-
-
-class MemoryMeter(BaseMeter):
-    '''Meter that stores values in memory for later use.
-       With the get_history method the values for a metric
-       can be retrieved.
-
-       Since it stores everything in memory, should be used with care
-       in order to avoid out of memory issues.
-    '''
-
-    def __init__(self, metrics=None, exclude=None):
-        super().__init__(metrics, exclude)
-        self.history = []
-
-    def get_history(self, name, min_step=0):
-        '''Get the history for one of the stored metrics.
-
-           Arguments:
-               name: the name of the metric
-               min_step: the minimum step where to start collecting the
-                stored history.
-        '''
-        result = []
-        steps = []
-        for (step, key, value) in self.history:
-            if (step >= min_step) and (name == key) and (value is not None):
-                result.append(value)
-                steps.append(step)
-        return steps, result
-
-    def display(self, ctx):
-        for key, calculator in self.metrics.items():
-            if key in self.updated:
-                value = calculator.result()
-                if value is not None:
-                    self.history.append((ctx["step"], key, value))
-        self.updated = {}
-
-    def state_dict(self):
-        return self.history
-
-    def load_state_dict(self, state):
-        self.history = state

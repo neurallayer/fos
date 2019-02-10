@@ -44,7 +44,7 @@ class PrecisionCalculator(BaseMacroCalculator):
         if self.n == 0:
             return None
         result = self.tp / (self.tp + self.fp + self.eps)
-        return result.mean()
+        return result.mean().item()
 
 
 class RecallCalculator(BaseMacroCalculator):
@@ -56,7 +56,7 @@ class RecallCalculator(BaseMacroCalculator):
         if self.n == 0:
             return None
         result = self.tp / (self.tp + self.fn + self.eps)
-        return result.mean()
+        return result.mean().item()
 
 
 class BetaCalculator(BaseMacroCalculator):
@@ -64,9 +64,8 @@ class BetaCalculator(BaseMacroCalculator):
     '''
 
     def __init__(self, beta=1, eps=1e-8):
-        super().__init__()
+        super().__init__(eps=eps)
         self.beta = beta
-        self.eps = eps
 
     def result(self):
         if self.n == 0:

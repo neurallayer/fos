@@ -5,33 +5,8 @@ import numpy as np
 import logging
 
 
-def get_clipping_class(optimClass, max_norm=1., norm_type=2):
-
-    class Clipper(optimClass):
-
-        def step(self):
-            for p in self.param_groups:
-                torch.nn.utils.clip_grad_norm_(
-                    p["params"], max_norm=max_norm, norm_type=norm_type)
-            return super().step()
-
-    return Clipper
-
-
-def add_scheduler(optim, Scheduler):
-
-    scheduler = Scheduler(optim)
-    orig_step = optim.step
-
-    def step():
-        orig_step()
-        scheduler.step()
-
-    optim.step = step
-
-
 class BaseDataset(torch.utils.data.Dataset):
-    '''Base Dataset that should be subclassed.
+    '''Base Dataset that could be subclassed.
     '''
 
     def __init__(self, transform=None, transform_y=None):
@@ -43,38 +18,41 @@ class BaseDataset(torch.utils.data.Dataset):
         '''length of the dataset'''
 
     def __getitem__(self, idx):
-        i = self.get_id(idx)
+        identifier = self.get_id(idx)
 
-        input = self.get_x(i)
+        input = self.get_x(identifier)
         if self.transform is not None:
             input = self.transform(input)
 
-        target = self.get_y(i)
+        target = self.get_y(identifier)
         if self.transform_y is not None:
             target = self.transform_y(target)
 
         return input, target
 
     def get_id(self, idx):
-        '''default implementation just return the idx
-           as identifier.
+        '''default implementation returns the idx
+           as identifier and doesn't perform any mapping.
         '''
         return idx
 
     @abstractmethod
     def get_x(self, identifier):
-        '''Return the x value'''
+        '''Return the input value(s) for the model. In case there are multiple
+           values, return a tuple.
+        '''
 
     @abstractmethod
     def get_y(self, identifier):
-        '''Return the target value'''
+        '''Return the target value(s) for the model.In case there are multiple
+           values, return a tuple.'''
 
 
 class ScalableRandomSampler(torch.utils.data.Sampler):
     r"""Samples elements randomly. User can specify ``num_samples`` to draw.
 
-    This sampler handles large datasets better then the default RandomSampler
-    but is more restricted in functionality. Samples are always drawn
+    This sampler handles large datasets better then the default RandomSampler that
+    comes with PyTorch but is more restricted in functionality. Samples are always drawn
     with replacement (but that is typically less of an issue with large datasets).
 
     Arguments:
@@ -100,11 +78,11 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
     def __iter__(self):
         max_idx = len(self.data_source)
         if self.low_mem:
-            # Doesn't allocate much additional memory
+            # Doesn't allocate a temporary array
             for _ in range(self.num_samples):
                 yield np.random.randint(0, max_idx)
         else:
-            # This is the fastest method but creates a large array
+            # This is a faster method but creates a temporary array
             for idx in np.random.randint(0, max_idx, self.num_samples):
                 yield idx
 
@@ -141,6 +119,10 @@ class SmartOptimizer():
         if self.scheduler is not None:
             self.scheduler.step()
 
+    @property
+    def param_group(self):
+        return self.optim.param_group        
+           
     def add_param_group(self, param_group):
         self.optim.add_param_group(param_group)
 
