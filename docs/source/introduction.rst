@@ -14,7 +14,7 @@ helps to better understand how to use and extend Fos. The four main guiding prin
 
     2. Inheritance & Polymorphism. 
        Rather then providing different types of hooks to plugin functionality, you extend 
-       Fos by inheriting classes like the SuperModel and override methods. Out of the box Fos already has
+       Fos by inheriting classes like the Supervisor and override methods. Out of the box Fos already has
        many classes included that help enrich behavior like that of the optimizer.
 
 
@@ -48,7 +48,7 @@ First import the required modules, including the three classes from Fos we are g
     import torch
     import torch.nn.functional as F
     from torchvision.models import resnet18 
-    from fos import SuperModel, Trainer, NotebookMeter
+    from fos import Supervisor, Trainer, NotebookMeter
 
 Then we create the model we want to train, an optimizer and the loss function::
 
@@ -56,9 +56,9 @@ Then we create the model we want to train, an optimizer and the loss function::
    optim     = torch.optim.Adam(predictor.parameters())
    loss      = F.binary_cross_entropy_with_logits
 
-Finally we create the supermodel, a meter and the trainer::
+Finally we create the supervised model, a meter and the trainer::
 
-   model   = SuperModel(predictor, loss)
+   model   = Supervisor(predictor, loss)
    meter   = NotebookMeter()
    trainer = Trainer(model, optim, meter)
 
@@ -77,13 +77,13 @@ package reference documentation.
 Components
 ==========
 
-SuperModel
+Supervisor
 ----------
-SuperModel is short for SupervisedModel and it is a model that adds a loss function
-to the model that you want to train. So you create an instance by providing both the model
-to train (we refer to this as the predictor) and the loss function::
+Supervisor is a model that adds a loss function to the model that you want to train.
+So you create an instance by providing both the model to train (we refer to this as the predictor) 
+and the loss function::
 
-    model = SuperModel(predictor, loss_fn)
+    model = Supervisor(predictor, loss_fn)
 
 
 Under the hood, the forward of the supermodel would look something like this::
@@ -93,19 +93,19 @@ Under the hood, the forward of the supermodel would look something like this::
         loss   = loss_fn(y_pred, target)
         return loss
 
-The SuperModel has additional functionality to train and validate a batch and is used by the Trainer to train the model.
-It is the SuperModel responsibility to perform backward step and also invoke the optimizer to update the model. And finally the SuperModel optionally invokes the additional metrics to get more insights how the model is performing.
+The Supervisor has additional functionality to train and validate a batch and is used by the Trainer to train the model.
+It is the Supervisor responsibility to perform both the forward and backward step. And the Supervisor optionally invokes the additional metrics to get more insights how the model is performing. However is is the trainer that updates 
+the model by invoking `optimizer.step`.
 
-The provided SuperModel implementation can handle most scenario's, but you can alway extend it to cather for specific use cases.
-
-supermodel_
+The provided Supervisor implementation can handle most scenario's, but you can alway extend it to 
+cather for specific use cases.
 
 Metric
 ------
-A metric is nothing more then a plain Python function that can be added to a SuperModel or a Trainer to get extra insights into
+A metric is nothing more then a plain Python function that can be added to a Supervisor or a Trainer to get extra insights into
 the performance of your model. There are two types of metrics support:
 
-1) Metrics that evaluate the prediction vs target values. These can be passed as an argument when you create a SuperModel. 
+1) Metrics that evaluate the prediction vs target values. These can be passed as an argument when you create a Supervisor. 
 2) metrics that evaluate the model itself. These can be passed as an argument when you create a Trainer.
 
 Metrics are optional and if you don't provide any, only the loss value will be added as a metric.
@@ -155,7 +155,7 @@ Fos tries to use the below terminology concise througout the documentation and s
 - epoch: running once through the provided dataset. Typically running once through the iterator provided
   by the PyTorch Dataloader, but can also iterate once over a simple Python list object for example. 
   
-- predictor: the model that you want to train and is wrapped in the SuperModel.
+- predictor: the model that you want to train and is wrapped in the Supervisor.
 
 - supermodel: short for supervised model and an subclass nn.Modue that adds a loss function to the predictor
   and performs a backward pass.
@@ -172,19 +172,21 @@ Fos tries to use the below terminology concise througout the documentation and s
 Inspiration
 ===========
 There are many other frameworks available, some of which also support PyTorch. Many of them
-have been  source of inspiration for Fos, but there are also some differences:
+have been source of inspiration for Fos, but there are also some differences:
 
-
-- PyTorch Ignite: very flexible and extensible framework while staying lightweight. Ignite has a more 
+- `PyTorch Ignite`: very flexible and extensible framework while staying lightweight. Ignite has a more 
   functional API and relies to registring handlers to extend functionality where Fos uses OO principles.  
   
-- FastAi: Includes many best practices out of the box behind the API and of course there are also 
+- `FastAI`: Includes many best practices out of the box behind the API and of course there are also 
   excellent courses to accompyning it. Fos does by default less magic behind the scene and the way to 
   include these best practices in your training is to use one of more the specialized classes.
 
-- Keras: Unfortunatly no support for PyTorch, but nice API and easy to use. One of key differences is that 
-  Keras abstracts most of the underlying machine learning engine (by design), where as Fos augments 
-  the engine reather than hiding it.
+- `Keras`: Unfortunatly no support for PyTorch, but nice API and very easy to use. One of key differences 
+  is that Keras abstracts most of the underlying machine learning engine (by design), where as 
+  Fos augments the engine (PyTorch) rather than hiding it.
+  
+- `Chainer`: Excellent API that also uses a OO approach. It has however its own ML engine and not 
+  PyTorch (although PyTorch and other engines borrowed a lot of their API's from Chainer)
 
 
 As always, give them a spin and see which framework suits your way of working best. 

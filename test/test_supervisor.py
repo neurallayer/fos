@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import resnet18
 
-from fos import SuperModel, Trainer, NotebookMeter
+from fos import Supervisor, Trainer
+from fos.meters import NotebookMeter
 
 
 def get_predictor():
@@ -17,10 +18,10 @@ def get_data(steps):
     return [(torch.randn(16, 10), torch.rand(16, 1)) for i in range(steps)]
 
 
-def test_supermodel_basic():
+def test_supervisor_basic():
     predictor = get_predictor()
     loss = F.mse_loss
-    model = SuperModel(predictor, loss)
+    model = Supervisor(predictor, loss)
 
     assert model.step == 0
 
@@ -43,13 +44,13 @@ def my_metric(y, t):
     return 1.
 
 
-def test_supermodel_metrics():
+def test_supervisor_metrics():
 
     metric_name = "test"
 
     predictor = get_predictor()
     loss = F.mse_loss
-    model = SuperModel(predictor, loss, metrics={metric_name: my_metric})
+    model = Supervisor(predictor, loss, metrics={metric_name: my_metric})
     assert model.step == 0
 
     data = get_data(1)[0]
@@ -59,13 +60,13 @@ def test_supermodel_metrics():
     assert output[metric_name] == 1.
 
 
-def test_supermodel_train():
+def test_supervisor_train():
     metric_name = "test"
 
     predictor = get_predictor()
     loss = F.mse_loss
     optim = torch.optim.Adam(predictor.parameters())
-    model = SuperModel(predictor, loss, metrics={metric_name: my_metric})
+    model = Supervisor(predictor, loss, metrics={metric_name: my_metric})
 
     assert model.step == 0
 

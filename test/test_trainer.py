@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fos import SuperModel, Trainer, MemoryMeter
+from fos import Supervisor, Trainer
+from fos.meters import MemoryMeter
 
 
 def get_predictor():
@@ -19,7 +20,7 @@ def test_trainer():
     predictor = get_predictor()
     loss = F.mse_loss
     optim = torch.optim.Adam(predictor.parameters())
-    model = SuperModel(predictor, loss)
+    model = Supervisor(predictor, loss)
     meter = MemoryMeter()
     trainer = Trainer(model, optim, meter)
 

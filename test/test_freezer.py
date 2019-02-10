@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fos import SuperModel, Trainer, NotebookMeter
+from fos import Supervisor, Trainer
+from fos.meters import NotebookMeter
 
 def get_predictor():
     return nn.Sequential(
@@ -14,10 +15,10 @@ def get_data(steps):
     return [(torch.randn(16, 10), torch.rand(16, 1)) for i in range(steps)]
 
 
-def test_supermodel():
+def test_supervisor():
     predictor = get_predictor()
     loss = F.mse_loss
-    model = SuperModel(predictor, loss)
+    model = Supervisor(predictor, loss)
 
     assert model.step == 0
 
@@ -30,7 +31,7 @@ def test_supermodel():
 def test_trainer():
     predictor = get_predictor()
     loss = F.mse_loss
-    model = SuperModel(predictor, loss)
+    model = Supervisor(predictor, loss)
 
     assert model.step == 0
 

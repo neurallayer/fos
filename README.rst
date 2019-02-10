@@ -33,7 +33,7 @@ loss function that you want to use using plain PyTorch objects::
 
 Then create the Fos classes that will take care of the training and output::
 
-   model   = SuperModel(predictor, loss)
+   model   = Supervisor(predictor, loss)
    meter   = NotebookMeter()
    trainer = Trainer(model, optim, meter)
 

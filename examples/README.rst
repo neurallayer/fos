@@ -18,15 +18,6 @@ Tensorboard
 The change of gradients and weights of the model during training are visualized in 
 Tensorboard. A useful technique to detect problems like vanishing gradient.
 
-Transfer Learning
------------------
-Demonstrates how to use transerfer learning to train a network. This includes
-features like freezing layers.
-
-Visualization
--------------
-Shows how to visualize some of the metrics that are captured during training. 
-
 Inputs
 ------
 Explains how to use models with multiple input and/or outputs.

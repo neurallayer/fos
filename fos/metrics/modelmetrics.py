@@ -63,7 +63,7 @@ class ParamHistogram():
         if (model.step % self.skip) != 0:
             return
 
-        supermodel = model
+        supervisor = model
 
         if self.predictor_only:
             model = model.predictor
@@ -72,11 +72,11 @@ class ParamHistogram():
 
             if self.include_weight:
                 name = "weight/" + k
-                self._write(name, v.data, supermodel.step)
+                self._write(name, v.data, supervisor.step)
 
             if self.include_gradient and hasattr(v, "grad"):
                 name = "gradient/" + k
-                self._write(name, v.grad, supermodel.step)
+                self._write(name, v.grad, supervisor.step)
 
         return None
 

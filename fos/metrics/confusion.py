@@ -14,7 +14,7 @@ class ConfusionMetric:
            
        Example:
             metric = ConfusionMetric(threshold=0.5, sigmoid=True)
-            model  = SuperModel(..., metrics = {"tp": metric})
+            model  = Supervisor(..., metrics = {"tp": metric})
             meter  = TensorBoardMeter(metrics={"tp": RecallCalculator()})
     '''
 

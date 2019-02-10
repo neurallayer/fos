@@ -5,9 +5,9 @@ display the progress during the training.
 
 There are 3 classes in the core package:
 
-1) SuperModel, that creates a supervised model with a loss function
+1) Supervisor, that creates a supervised model with a loss function
 2) Trainer, that will run the training including validation
-3) Mover, that will move tensors to a certain device like a GPU
+3) Mover, that will move tensors to a device like a GPU
 
 '''
 
@@ -19,15 +19,21 @@ import torch.nn as nn
 import logging
 
 
-class SuperModel(nn.Module):
-    '''SuperModel is short for `SupervisedModel` and extends a regular model
-       with a loss function. This class is still a valid `nn.Module` in PyTorch
-       but adds functionality that the trainer will use to train the model.
+class Supervisor(nn.Module):
+    '''Supervisor extends a regular PyTorch model with a loss function. This class is extends from 
+       `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
+       not typical, it is possible to have multiple trainers train the same model.
+       
+       Besides the added loss function, also additional metrics can be specified to get insights into
+       the performance of model.
 
        Args:
            predictor (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
-           metrics (dict): The metrics that should be generated during the training and validation
+           metrics (dict): The metrics that should be evaluated during the training and validation
+           
+       Example:
+           model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
     def __init__(self, predictor, loss_fn, metrics=None):
@@ -38,7 +44,7 @@ class SuperModel(nn.Module):
         self.step = 0
 
     def handle_metrics(self, loss, input, target):
-        '''Invoke the configured metrics functions return the result
+        '''Invoke the configured metrics functions and return the result
 
            Args:
                loss (scaler): the loss value
@@ -58,8 +64,8 @@ class SuperModel(nn.Module):
         '''Implementation of the forward method in nn.Module
 
            Args:
-               x (Tensor): the input data for the model
-               t (Tensor): the target data for the loss function
+               input (Tensor): the input data for the model
+               target (Tensor): the target data for the loss function
         '''
         pred = self.predictor(input)
         loss = self.loss_fn(pred, target)
@@ -70,7 +76,7 @@ class SuperModel(nn.Module):
            will be generated when predicitng values.
 
            Args:
-               x (Tensor): the input tensor
+               input (Tensor): the input tensor
         '''
         pred = self.predictor(input)
         return pred
@@ -81,8 +87,8 @@ class SuperModel(nn.Module):
            with the loss value.
 
            Args:
-               x (Tensor): the input tensor
-               t (Tensor): the target tensor
+               input (Tensor): the input tensor
+               target (Tensor): the target tensor
         '''
         loss, pred = self(input, target)
         return self.handle_metrics(loss.item(), pred, target)
@@ -94,8 +100,8 @@ class SuperModel(nn.Module):
            with the loss value.
 
            Args:
-               x (Tensor): the input data
-               t (Tensor): the target data
+               input (Tensor): the input data
+               target (Tensor): the target data
                optim (Optimizer): the optimizer to use to update the model
 
         '''
@@ -119,9 +125,9 @@ class Trainer():
     '''Train your supervised model using an optimizer.
 
        Args:
-           model (SuperModel): the supervised model that will be trained
-           optim (Optimizer): the optimizer to use
-           meter (Meter): what meter should be used to handle and display the metrics
+           model (Supervisor): the supervised model that needs to be trained
+           optim (Optimizer): the optimizer to use to update the model
+           meter (Meter): what meter should be used to handle and display metrics
            metrics (dict): The model metrics (like gradients) that should be generated
             during training (model metrics are not applied during the validation phase)
            mover: the mover to use. If None is specified, a default mover will be created to move
