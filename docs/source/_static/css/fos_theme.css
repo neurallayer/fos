@@ -5,3 +5,7 @@ body {
 h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend, p.caption {
     font-family: "Roboto","Helvetica Neue",Arial,sans-serif;
 }
+
+.wy-side-nav-search {
+    background-color: #096096
+}

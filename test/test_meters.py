@@ -1,26 +1,40 @@
 from unittest.mock import Mock
 
-# The the standard meters that are being provided.
-from fos.meters import PrintMeter, NotebookMeter, MemoryMeter, TensorBoardMeter
+# The standard meters that are being provided.
+from fos.meters import PrintMeter, MultiMeter, NotebookMeter, MemoryMeter, TensorBoardMeter
 
 
 def init_meter(meter, steps):
     for i in range(steps):
         meter.update("loss", 1/(i+10))
-        meter.display({"phase":"train", "step": i+1, "epoch":1})
+        meter.display({"phase":"train", "step": i+1, "epoch":1, "progress":0.5})
     
     
 def test_printmeter():
     meter = PrintMeter()
     cnt = 10
-    init_meter(meter, cnt)   
-
+    init_meter(meter, cnt) 
+    meter.reset()
+    state = meter.state_dict()
+    assert state == None
+    
+def test_multimeter():
+    meter = MultiMeter(MemoryMeter(), MemoryMeter())
+    cnt = 10
+    init_meter(meter, cnt) 
+    meter.reset()
+    state = meter.state_dict()
+    assert len(state) == 2
 
 def test_notebookmeter():
     meter = NotebookMeter()
+    meter.tqdm = Mock()
     cnt = 10
-    # init_meter(meter, cnt)  
-    
+    init_meter(meter, cnt)
+    meter.reset()
+    state = meter.state_dict()
+    assert state == None
+
     
 def test_memorymeter():
     meter = MemoryMeter()

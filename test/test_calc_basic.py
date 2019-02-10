@@ -75,3 +75,4 @@ def test_min():
 
     calc.clear()
     assert calc.result() is None
+

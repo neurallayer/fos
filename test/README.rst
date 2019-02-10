@@ -24,3 +24,12 @@ Structure
 =========
 Every main class/component has its own unittest file. Smaller classes are grouped
 into one unittest file (often by module name)
+
+
+Coverage
+========
+If you have installed pytest-cov, you can also check the code coverage::
+
+     cd test
+     py.test --cov=fos .
+     

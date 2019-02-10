@@ -15,7 +15,7 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-
+import fos
 
 # -- Project information -----------------------------------------------------
 
@@ -23,10 +23,12 @@ project = 'fos'
 copyright = '2019, Fos Authors'
 author = 'Fos Authors'
 
+
 # The short X.Y version
-version = ''
+# version = fos.__version__ 
 # The full version, including alpha/beta/rc tags
-release = '0.3.0'
+version = 'master (' + fos.__version__ + ' )'
+release = 'master'
 
 
 # -- General configuration ---------------------------------------------------
