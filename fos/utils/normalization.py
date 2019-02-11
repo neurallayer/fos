@@ -1,25 +1,29 @@
 import numpy as np
+import torch
 
 
 def get_normalization(dataloader, max_iter=None, feature_dim=1):
-    '''Calculates the mean and standard deviation for a Tensors.
+    '''Calculates the mean and standard deviation for the data from a 
+    dataloader. The output can be used for normalizing the images
+    before feeding them to a neural network.
 
-       The dataloader should return either just the batch of image or
-       a tuple/list of which the first element is the image.
+    The dataloader should return either just the batch of tensors or
+    a tuple/list of which the first element is the tensor.
+       
+    Args:
+        dataloader: The datalaoder you want to use to get the images
+        max_iter: Limit the number of iterations. If None, all the iterations in the
+         dataloader will be used. It should be noted that if a batch has more then one sample,
+         the actual number of samples equals: samples = max_iter * batch_size
+         feature_dim: which dimension has the features to normalize.
 
-       The output can be used for normalizing the images
-       before feeding them to a neural network.
+    Example usage:
+       
+    .. code-block:: python
 
-       Args:
-           dataloader: The datalaoder you want to use to get the images
-           max_iter: Limit the number of iterations. If None, all the iterations in the
-             dataloader will be used. It should be noted that if a batch has more then one sample,
-             the actual number of samples equals: samples = max_iter * batch_size
-           feature_dim: which dimension has the features to normalize.
-
-        Examples:
-            n = get_normalization(image_loader, 1000, 1) #Image tensors with the format  NxCxWxH (PyTorch format): 1
-        '''
+        # Image tensors with the format  NxCxWxH (PyTorch format)
+        n = get_normalization(image_loader, 1000, 1) 
+    '''
 
     s = 0.
     m = 0.
@@ -47,4 +51,4 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
         s += np.std(data, axis=axis)
         m += np.mean(data, axis=axis)
 
-    return {"mean": m / samples, "std": s / samples}
+    return {"mean": m/step, "std": s/step}

@@ -30,3 +30,12 @@ def test_trainer():
     
     trainer.run(data, epochs=10)
     assert trainer.epoch == 11
+    
+    valid_data = get_data(100)
+    trainer.validate(valid_data)
+    assert trainer.epoch == 11
+    
+    batch_size = 16
+    test_data = [torch.randn(batch_size, 10) for i in range(20)]
+    result = trainer.predict(test_data)
+    assert len(result) == len(test_data)*batch_size

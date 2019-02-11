@@ -1,11 +1,12 @@
 import setuptools
+import fos
 
 with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="fos",
-    version="0.4.2",
+    version=fos.__version__,
     author="Fos Authors",
     author_email="peter@jbaron.com",
     description="Deeplearning framework for PyTorch",

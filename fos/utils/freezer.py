@@ -1,21 +1,24 @@
 
 class Freezer():
     '''Provides functionality to freeze/unfreeze parameters in a model based
-       on their name. This comes in handy during transfer learning at
-       the beginning of the training when you only want to train the newly added layers.
+    on their name. This comes in handy during transfer learning at
+    the beginning of the training when you only want to train the newly added layers.
        
-       If you want to know the names of the paramters, use `freezer.summary()`.
+    If you want to know the names of the paramters, use `freezer.summary()`.
 
-       Args:
-           model (nn.Module): the model you want to use.
+    Args:
+        model (nn.Module): the model you want to use.
 
-       Examples:
-           freezer = Freezer(my_model)
-           freezer.freeze() # freeze all layers
-           freezer.unfreeze("fc") # unfreeze last layer
-           trainer.run(data, epochs=1)
-           freezer.unfreeze() # unfreeze all layers
-           trainer.run(data, epochs=50)
+    Example usage:
+       
+    .. code-block:: python
+
+        freezer = Freezer(my_model)
+        freezer.freeze() # freeze all layers
+        freezer.unfreeze("fc") # unfreeze layer who's name starts with "fc"
+        trainer.run(data, epochs=1)
+        freezer.unfreeze() # unfreeze all layers
+        trainer.run(data, epochs=50)
     '''
 
     def __init__(self, model):

@@ -60,6 +60,13 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
         num_samples (int): number of samples to draw, default=len(dataset)
         low_mem (bool): if memory is sparse use this option to avoid
         allocating additional memory
+               
+    Example usage:
+       
+       .. code-block:: python
+       
+            sampler = ScalableRandomSampler(dataset, num_samples=10000)
+            data_loader = Dataloader(dataset, sampler=sampler, ...)
     """
 
     def __init__(self, data_source, num_samples=None, low_mem=False):
@@ -91,14 +98,19 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
 
 
 class SmartOptimizer():
-    '''Add clipping and scheduling capabilities to a regular
-       optimizer.
+    '''Add clipping and scheduling capabilities to a regular optimizer.
 
-       Args:
-           optim (Optimizer): the optimizer to use
-           clipper (tuple): clipping parameters as a tuple (max_norm, norm_type). See also
-               `torch.nn.utils.clip_grad_norm_` for more details
-           scheduler (Scheduler): the scheduler to use
+    Args:
+        optim (Optimizer): the optimizer to use
+        clipper (tuple): clipping parameters as a tuple (max_norm, norm_type). See also
+            `torch.nn.utils.clip_grad_norm_` for more details
+        scheduler (Scheduler): the scheduler to use
+           
+    Example usage:
+       
+    .. code-block:: python
+
+        smart_optim = SmartOptimizer(optim, clipper=(1,2), scheduler=my_scheduler)
     '''
 
     def __init__(self, optim, clipper=None, scheduler=None):

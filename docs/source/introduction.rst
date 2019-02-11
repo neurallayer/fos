@@ -62,7 +62,8 @@ Finally we create the supervised model, a meter and the trainer::
    trainer = Trainer(model, optim, meter)
 
 And we are ready to start the training. We create some dummy data in this example that emulates 
-the input images and target values en then run the trainer::
+the input images and target values. Typically this would be a dataloader in a real scenario. 
+And then we can run the trainer::
 
    dummy_data = [(torch.randn(4,3,224,224), torch.rand(4,1000).round()) for i in range(10)]
    trainer.run(dummy_data, epochs=5)
@@ -84,7 +85,7 @@ and the loss function::
 
     model = Supervisor(predictor, loss_fn)
 
-Under the hood, the forward of the supermodel would look something like this::
+Under the hood, the forward of the supervisor would look something like this::
 
     def forward(self, x, target):
         y_pred = predictor(x)
@@ -104,7 +105,7 @@ Trainer
 The trainer is the coponent that glues all other components together and responsible for running the training epochs. 
 The trainer contains the loops that go over the provided data (trainer.run). 
 
-To initiate a trainer you need to provide at least a supermodel, optimizer and meter::
+To initiate a trainer you need to provide at least a supervisor, optimizer and meter::
 
     trainer = Trainer(model, optimizer, meter)
     

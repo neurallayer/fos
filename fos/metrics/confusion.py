@@ -12,7 +12,10 @@ class ConfusionMetric:
            threshold: what threshold to use to say a probabity represents a true label 
            sigmoid: should a sigmoid be applied before determining true labels
            
-       Example:
+       Example usage:
+       
+       .. code-block:: python
+
             metric = ConfusionMetric(threshold=0.5, sigmoid=True)
             model  = Supervisor(..., metrics = {"tp": metric})
             meter  = TensorBoardMeter(metrics={"tp": RecallCalculator()})

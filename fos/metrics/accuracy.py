@@ -1,24 +1,29 @@
 
 class BinaryAccuracy():
-    '''Calculate the binary accuracy score between the predicted and target values'''
+    '''Calculate the binary accuracy score between the predicted and target values.
+    
+    Args:
+        threshold (float): The threshold to use to determine if the input value is 0 or 1
+        sigmoid (bool): should sigmoid activatin be applied to the input
+    '''
 
     def __init__(self, threshold=0., sigmoid=False):
         self.sigmoid = sigmoid
         self.threshold = threshold
         
-    def __call__(self, y, t):
+    def __call__(self, input, target):
 
-        y = y.flatten(1)
-        t = t.flatten(1)
+        input = input.flatten(1)
+        target = target.flatten(1)
 
-        assert y.shape == t.shape, "Shapes of target and predicted values should be same"
+        assert input.shape == target.shape, "Shapes of target and predicted values should be same"
 
         if self.sigmoid:
-            y = y.sigmoid()
+            input = input.sigmoid()
 
-        y = (y > self.threshold).int().cpu()
-        t = t.int().cpu()
+        input = (input > self.threshold).int().cpu()
+        target = target.int().cpu()
         
-        return (y == t).float().mean().item()
+        return (input == target).float().mean().item()
         
     

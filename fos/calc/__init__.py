@@ -49,7 +49,7 @@ class MomentumCalc(Calculator):
        value = beta*value + (1-beta)*new_value
 
        If it is called the first time it will use the provided
-       value as initialization value:
+       value as initialization value::
 
            value = new_value
 
