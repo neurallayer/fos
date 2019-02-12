@@ -12,7 +12,7 @@ setuptools.setup(
     description="Deeplearning framework for PyTorch",
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    url="https://github.com/innerlogic/fos",
+    url="https://github.com/quanta/fos",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.5",

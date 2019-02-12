@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from fos.utils import *
 from fos.utils.freezer import *
 from fos.utils.normalization import *
+from fos.utils.schedulers import *
 import torch
 import torch.nn.functional as F
 from torchvision.models import resnet18
@@ -25,3 +26,11 @@ def test_normalization():
     assert "mean" in n
     assert "std" in n
     assert len(n["mean"]) == 100
+    
+    
+def test_scheduler():
+    model = resnet18()
+    optim = torch.optim.Adam(model.parameters())
+    scheduler = CosineAnnealingRestartsLR(optim, T=1)
+    for i in range(100):
+        scheduler.step()

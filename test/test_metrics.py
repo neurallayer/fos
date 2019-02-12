@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+from fos import Supervisor
 from fos.metrics import *
 from fos.metrics.modelmetrics import *
 from fos.metrics.confusion import *
@@ -35,3 +36,12 @@ def test_learning_rates():
     optim = torch.optim.Adam(model.parameters(), lr=0.05)
     lr = learning_rates(model, optim)
     assert lr == 0.05
+
+def test_paramhistogram():
+    predictor = resnet18()
+    writer = Mock()
+    loss = Mock()
+    model = Supervisor(predictor, loss)
+    metric = ParamHistogram(include_gradient=False, predictor_only=False)
+    metric(model, None)
+    assert writer.add_histogram.is_called()

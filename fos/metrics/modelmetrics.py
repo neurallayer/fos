@@ -2,14 +2,6 @@ import logging
 import numpy as np
 
 
-def basic_model_metrics(model):
-    std = []
-    for param in model.parameters():
-        std.append(param.data.std().item())
-
-    return np.array(std)
-
-
 class ParamHistogram():
     '''Make histograms of the weights and gradients of the parameters
        in the model. This metric writes directly to a tensorboard file and
