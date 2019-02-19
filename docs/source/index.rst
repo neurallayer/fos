@@ -1,11 +1,9 @@
 .. fos documentation master file, created by
    sphinx-quickstart on Sun Feb  3 09:33:20 2019.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-Fos Documentation
+FOS Documentation
 =================
-Fos is a Python framework that makes it easier to develop and test neural network models 
+FOS is a Python framework that makes it easier to develop and test neural network models 
 in PyTorch.
 
 

@@ -19,9 +19,9 @@ import fos
 
 # -- Project information -----------------------------------------------------
 
-project = 'fos'
-copyright = '2019, Fos Authors'
-author = 'Fos Authors'
+project = 'FOS'
+copyright = '2019, FOS Authors'
+author = 'FOS Authors'
 
 
 # The short X.Y version

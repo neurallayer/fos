@@ -181,8 +181,8 @@ class Trainer():
     def _update_model(self):
         '''Update the model. At this point the model has performed both the
         forward and backward step. The default implementation invokes the
-        `optimizer.step` to perform the updates and afterwards reset the
-        gradients.
+        `optimizer.step()` to perform the updates and afterwards reset the
+        gradients with `optimizer.zero_grad()`.
         '''
         self.optim.step()
         self.optim.zero_grad()
@@ -209,7 +209,7 @@ class Trainer():
     def validate(self, data):
         '''Validate the model using the data provided. Typically you
            would use `trainer.run` instead since that will also handle lifecycle
-           of meters, unless you only want to run a vilidation cycle.
+           of meters, unless you only want to run a validation cycle.
 
            Args:
                data: the validation data to use.
@@ -222,27 +222,36 @@ class Trainer():
                 self._update_meter(output, "val_")
             self._display_meter("valid")
 
-    def predict(self, data):
-        '''Predict the outcome given the provided input data.
-           Data is expected to be an iterable, like for example a
-           dataloader or a numpy array.
+    def predict(self, data, calculator=None):
+        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
+           like for example a dataloader or a numpy array. 
+           
+           If a collector function is provided this function is called after each batch 
+           to store/process the predictions. If this function is not provided, all the 
+           predictions are concatenated and returned as a numpy array.
 
            Args:
                data: the input data to use
+               calculator (Calculator): the calculator to invoke after each batch to process the predictions.
+                 if None is provided, the default behavior is to return all the results appended in one 
+                 large list.
 
-           Note: since this method stores all the results before returning them,
-           this is not well suited for large number of big result tensors due to
-           memory usage.
+           Note: if you don't provide a calculator, all results are stored in memory. This can cause memory 
+           issues if you have a lot of data and large prediction tensors.
         '''
         result = []
 
+        if calculator is None:
+            calculator = CollectCalculator() 
+            
         self.model.eval()
         with torch.set_grad_enabled(False):
             for input in self.mover(data):
                 pred = self.model.predict(input)
-                result.extend(pred.cpu().detach().numpy())
-
-        return np.array(result)
+                calculator.add(pred)
+                               
+        return calculator.result()
+        
 
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
@@ -254,14 +263,15 @@ class Trainer():
                valid_data: the data to use for the validation, default = None.
                epochs (int): the number of epochs to run the training for, default = 1
         '''
-        for _ in range(epochs):
+        try:
+            for _ in range(epochs):
+                self.meter.reset()
+                self.train(data)
+                if valid_data is not None:
+                    self.validate(valid_data)
+                self.epoch += 1
+        finally:
             self.meter.reset()
-            self.train(data)
-            if valid_data is not None:
-                self.validate(valid_data)
-            self.epoch += 1
-
-        self.meter.reset()
 
     def state_dict(self):
         return {
@@ -285,7 +295,7 @@ class Trainer():
            continue training where it was left off.
 
            Please note::
-               This method doesn't store the model itself, just the trained paramters.
+               This method doesn't store the model itself, just the trained parameters.
                It is recommended to use regular version control like `git` to save
                different versions of the code that creates the model.
 
@@ -393,3 +403,35 @@ class Mover():
     def __call__(self, data):
         for batch in data:
             yield self.move(batch)
+
+            
+            
+class CollectCalculator():
+    '''Calculator suited for collecting Tensors and others values. If the value
+    that is added is PyTorch Tensor, it is detached and moved to a numpy structure. Otherwise 
+    the value is just added directly to the overall result.
+    
+    Since this calculator doesn't reduce the captured values, it can consume a lot of memory
+    based on the volume and size of the added values.
+    
+    Args:
+        sigmoid (bool): in case the value is a PyTorch Tensor, should a sigmoid be applied.
+    '''
+    
+    def __init__(self, sigmoid=False):
+        self.data=[]
+        self.sigmoid = sigmoid
+        
+    def add(self, pred):
+        if torch.is_tensor(pred):
+            if self.sigmoid:
+                pred = torch.sigmoid(pred)
+            self.data.extend(pred.cpu().detach().numpy())
+        else:
+            self.data.extend(pred)
+
+    def clear(self, pred):
+        self.data = []
+
+    def result(self):
+        return self.data

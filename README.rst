@@ -1,6 +1,6 @@
 Introduction
 ============
-**Fos** is a Python framework that makes it easier to develop neural network models 
+**FOS** is a Python framework that makes it easier to develop neural network models 
 in PyTorch. Some of the main features are:
 
 * Less boilerplate code required, see also the example below.
@@ -11,7 +11,7 @@ in PyTorch. Some of the main features are:
 
 Installation
 ============
-You can install Fos using pip::
+You can install FOS using pip::
 
     pip install fos
     
@@ -31,7 +31,7 @@ loss function that you want to use using plain PyTorch objects::
    optim     = Adam(predictor.parameters())
    loss      = F.binary_cross_entropy_with_logits
 
-Then create the Fos classes that will take care of the training and output::
+Then create the FOS classes that will take care of the training and output::
 
    model   = Supervisor(predictor, loss)
    meter   = NotebookMeter()

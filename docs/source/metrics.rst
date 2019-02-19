@@ -10,7 +10,7 @@ of which the key is name under which the metric wil be known and the value is th
     trainer = Trainer(..., metrics={"avgweights": my_weights_metric})
 
 
-There are two different types of metrics that are being supported by Fos:
+There are two different types of metrics that are being supported by FOS:
 
 1. Prediction Metrics. These metrics are invoked after a prediction is made::
 

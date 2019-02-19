@@ -1,77 +1,77 @@
 Introduction
 ============
-This document provides insights into the thoughts and ideas behind Fos and 
-helps to better understand how to use and extend Fos. The main guiding principles are
+This document provides insights into the thoughts and ideas behind FOS and 
+helps to better understand how to use and extend FOS. The main guiding principles are
 
 *  **Simple** to use and extend. The basic funcitonality should be easy to grasp so you quickly can get started. 
-   However when you need more advanced features it should still be possible to extend the framework to do so. Fos
+   However when you need more advanced features it should still be possible to extend the framework to do so. FOS
    relies on good OO principles to make this possible:
   
     1. Encapsulation & Abstraction.
-       Fos tries to be very concise which class performs what functionality. This makes it easier to understand 
+       FOS tries to be very concise which class performs what functionality. This makes it easier to understand 
        the framework but perhas more importantly also how to extend it. For an introduction see the 
        Components section below.
        
     2. Inheritance & Polymorphism. 
        Rather then providing different types of hooks to plugin functionality, you extend 
-       Fos by inheriting classes like the Supervisor and override methods. Out of the box Fos already has
+       FOS by inheriting classes like the Supervisor and override methods. Out of the box FOS already has
        many classes included that help enrich behavior like that of the optimizer.
        
 *  **Lightweight**: try to be as lightweight as possible and don't perform too much kind of magic 
    under the hood. It is important that it is easy to grasp what a framework is actualy doing so it 
-   doesn't work against you at times. Fos uses plain PyTorch objects where possible and only adds features
+   doesn't work against you at times. FOS uses plain PyTorch objects where possible and only adds features
    where it really adds value.
                 
 *  **Insightful**: perhaps the most challanging task of developing a neural network is investigating why it 
-   doesn't perform as expected. Fos facilitates getting the required insights of what is going on and 
+   doesn't perform as expected. FOS facilitates getting the required insights of what is going on and 
    what can be done to improve the peformance. 
   
-   Below is an example of the type of insights Fos can generate (in this case the histograms of the gradients 
+   Below is an example of the type of insights FOS can generate (in this case the histograms of the gradients 
    of the model plotted over time).
   
    .. image:: /_static/img/tensorboard_gradients.png
    
 *  **Repeatable**: once you are developing models, it is important that you can easily repeat results and
-   can continue where you left off. So Fos for example makes it easy to store and save the trianing state.
+   can continue where you left off. So FOS for example makes it easy to store and save the trianing state.
 
 
 Quick Start
 ===========
-The following code shows the steps required to train a model. In this example we'll use the resnet18
-model that comes with PyTorch vision.
+    The following code shows the steps required to train a model. In this example we'll use the resnet18
+    model that comes with PyTorch vision.
 
-First import the required modules, including the three classes from Fos we are going to use::
+    First import the required modules, including the three classes from FOS we are going to use::
 
-    import torch
-    import torch.nn.functional as F
-    from torchvision.models import resnet18 
-    
-    from fos import Supervisor, Trainer
-    from fos.meters import NotebookMeter
+        import torch
+        import torch.nn.functional as F
+        from torchvision.models import resnet18 
 
-Then we create the model we want to train, an optimizer and the loss function::
+        from fos import Supervisor, Trainer
+        from fos.meters import NotebookMeter
 
-   predictor = resnet18()
-   optim     = torch.optim.Adam(predictor.parameters())
-   loss      = F.binary_cross_entropy_with_logits
+    Then we create the model we want to train, an optimizer and the loss function::
 
-Finally we create the supervised model, a meter and the trainer::
+       predictor = resnet18()
+       optim     = torch.optim.Adam(predictor.parameters())
+       loss      = F.binary_cross_entropy_with_logits
 
-   model   = Supervisor(predictor, loss)
-   meter   = NotebookMeter()
-   trainer = Trainer(model, optim, meter)
+    Finally we create the supervised model, a meter and the trainer::
 
-And we are ready to start the training. We create some dummy data in this example that emulates 
-the input images and target values. Typically this would be a dataloader in a real scenario. 
-And then we can run the trainer::
+       model   = Supervisor(predictor, loss)
+       meter   = NotebookMeter()
+       trainer = Trainer(model, optim, meter)
 
-   dummy_data = [(torch.randn(4,3,224,224), torch.rand(4,1000).round()) for i in range(10)]
-   trainer.run(dummy_data, epochs=5)
+    And we are ready to start the training. We create some dummy data in this example that emulates 
+    the input images and target values. Typically this would be a dataloader in a real scenario. 
+    And then we can run the trainer::
 
-So only a few lines of code are required to get started. And the above if a fully
-working example, no steps skipped. The following section gives an highlevel overview of the Fos 
-components we just used and their purpose. If you want to get more details, best to dive into the 
-package reference documentation or one of the notebooks.
+       dummy_data = [(torch.randn(4,3,224,224), torch.rand(4,1000).round()) for i in range(10)]
+       trainer.run(dummy_data, epochs=5)
+
+    So only a few lines of code are required to get started. And the above if a fully
+    working example, no steps skipped. The following section gives an highlevel overview of the FOS 
+    components we just used and their purpose. If you want to get more details, best to dive into the 
+    package reference documentation or one of the notebooks.
 
 
 Components
@@ -149,18 +149,18 @@ The following diagram shows the interactin between the various components when y
 Inspiration
 ===========
 There are many other frameworks available, some of which also support PyTorch. Many of them
-have been source of inspiration for Fos, but there are also some differences:
+have been source of inspiration for FOS, but there are also some differences:
 
 - ``PyTorch Ignite``: very flexible and extensible framework while staying lightweight. Ignite has a more 
-  functional API and relies to registring handlers to extend functionality where Fos uses OO principles.  
+  functional API and relies to registring handlers to extend functionality where FOS uses OO principles.  
   
 - ``FastAI``: includes many best practices out of the box behind the API and of course there are also 
-  excellent courses to accompyning it. Fos does by default less magic behind the scene and the way to 
+  excellent courses to accompyning it. FOS does by default less magic behind the scene and the way to 
   include these best practices in your training is to use one of more the specialized classes.
 
 - ``Keras``: unfortunatly no support for PyTorch, but nice API and very easy to use. One of key differences 
   is that Keras abstracts most of the underlying machine learning engine (by design), where as 
-  Fos augments the engine (PyTorch) rather than hiding it.
+  FOS augments the engine (PyTorch) rather than hiding it.
   
 - ``Chainer``: excellent API that also uses a OO approach. It has however its own ML engine and not 
   PyTorch (although PyTorch and other engines borrowed a lot of their API's from Chainer)

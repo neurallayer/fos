@@ -1,4 +1,4 @@
-Contributing to Fos
+Contributing to FOS
 -------------------
 
 If you are interested in helping out with Fos, your contributions are more than welcome.
@@ -31,6 +31,6 @@ Fos testing is located under `test/`. Run the entire test suite with PyTest::
 
 Writing documentation
 ---------------------
-Fos uses [Google style](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
+FOS uses [Google style](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
 for formatting docstrings. Length of line inside docstrings block must be limited to 80 characters 
 to fit into Jupyter documentation popups.
