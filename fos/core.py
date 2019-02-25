@@ -32,6 +32,9 @@ class Supervisor(nn.Module):
            predictor (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
            metrics (dict): The metrics that should be evaluated during the training and validation
+           mover: the mover to use. If None is specified, a default mover will be created to move
+           tensors to the correct device
+
            
        Example usage:
        
@@ -40,12 +43,13 @@ class Supervisor(nn.Module):
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
-    def __init__(self, predictor, loss_fn, metrics=None):
+    def __init__(self, predictor, loss_fn, metrics=None, mover=None):
         super().__init__()
         self.predictor = predictor
         self.metrics = metrics if metrics is not None else {}
         self.loss_fn = loss_fn
         self.step = 0
+        self.mover = mover if mover is not None else Mover.get_default(predictor)
 
     def handle_metrics(self, loss, input, target):
         '''Invoke the configured metrics functions and return the result
@@ -77,23 +81,28 @@ class Supervisor(nn.Module):
 
     def predict(self, input):
         '''Predict a single batch of data and return the result. No metrics
-           will be generated when predicitng values.
+           will be generated when predicting values. The data will be moved to the 
+           device using the configured mover.
 
            Args:
                input (Tensor): the input tensor
         '''
+        input = self.mover(input)
         pred = self.predictor(input)
         return pred
-
+    
+    
     def validate(self, input, target):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value.
+           with the loss value. The data will be moved to the 
+           device using the configured mover.
 
            Args:
                input (Tensor): the input tensor
                target (Tensor): the target tensor
         '''
+        input, target = self.mover(input), self.mover(target)
         loss, pred = self(input, target)
         return self.handle_metrics(loss.item(), pred, target)
 
@@ -101,7 +110,8 @@ class Supervisor(nn.Module):
         '''Perform a single learning step. This method is normally invoked by
            the trainer but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value.
+           with the loss value. The data will be moved to the 
+           device using the configured mover.
 
            Args:
                input (Tensor): the input data
@@ -110,6 +120,7 @@ class Supervisor(nn.Module):
 
         '''
         self.step += 1
+        input, target = self.mover(input), self.mover(target)
         loss, pred = self(input, target)
         loss.backward()
         return self.handle_metrics(loss.item(), pred, target)
@@ -134,8 +145,6 @@ class Trainer():
            meter (Meter): what meter should be used to handle and display metrics
            metrics (dict): The model metrics (like gradients) that should be generated
             during training (model metrics are not applied during the validation phase)
-           mover: the mover to use. If None is specified, a default mover will be created to move
-            tensors to the correct device
                
        Example usage:
 
@@ -147,13 +156,12 @@ class Trainer():
 
     '''
 
-    def __init__(self, model, optim, meter, metrics=None, mover=None):
+    def __init__(self, model, optim, meter, metrics=None):
         self.model = model
         self.optim = optim
         self.metrics = metrics if metrics is not None else {}
         self.epoch = 0
         self.id = str(int(time.time()))
-        self.mover = mover if mover is not None else Mover.get_default(model)
         self.meter = meter
 
     def _update_meter(self, output, prefix=""):
@@ -198,7 +206,7 @@ class Trainer():
         self.model.train()
         with torch.set_grad_enabled(True):
             steps_per_epoch = len(data)
-            for idx, (input, target) in enumerate(self.mover(data)):
+            for idx, (input, target) in enumerate(data):
                 output = self.model.learn(input, target)
                 self._update_meter(output)
                 self._handle_metrics()
@@ -217,7 +225,7 @@ class Trainer():
 
         self.model.eval()
         with torch.set_grad_enabled(False):
-            for input, target in self.mover(data):
+            for input, target in data:
                 output = self.model.validate(input, target)
                 self._update_meter(output, "val_")
             self._display_meter("valid")
@@ -246,7 +254,7 @@ class Trainer():
             
         self.model.eval()
         with torch.set_grad_enabled(False):
-            for input in self.mover(data):
+            for input in data:
                 pred = self.model.predict(input)
                 calculator.add(pred)
                                
@@ -382,14 +390,15 @@ class Mover():
         device = next(model.parameters()).device
         return Mover(device)
 
-    def move(self, batch):
+    def __call__(self, batch):
         '''Move a single batch to the device'''
 
         if torch.is_tensor(batch):
             return batch.to(device=self.device, non_blocking=self.non_blocking)
 
-        if isinstance(batch, (tuple, list)):
-            return tuple([self.move(elem) for elem in batch])
+        if isinstance(batch, list):
+            batch = [self(row) for row in batch]
+            return batch
 
         if isinstance(batch, np.ndarray):
             batch = torch.from_numpy(batch)
@@ -400,9 +409,6 @@ class Mover():
             type(batch))
         return batch
 
-    def __call__(self, data):
-        for batch in data:
-            yield self.move(batch)
 
             
             
