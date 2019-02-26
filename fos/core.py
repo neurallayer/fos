@@ -56,7 +56,7 @@ class Supervisor(nn.Module):
 
            Args:
                loss (scaler): the loss value
-               y (Tensor): the predicted value
+               input (Tensor): the predicted value
                target (Tensor): the target value
         '''
         output = {}
@@ -80,16 +80,18 @@ class Supervisor(nn.Module):
         return loss, pred
 
     def predict(self, input):
-        '''Predict a single batch of data and return the result. No metrics
+        '''Predict a batch of data at once and return the result. No metrics
            will be generated when predicting values. The data will be moved to the 
            device using the configured mover.
 
            Args:
-               input (Tensor): the input tensor
+               input (Tensor): the batch of input tensors
         '''
-        input = self.mover(input)
-        pred = self.predictor(input)
-        return pred
+        self.eval()
+        with torch.set_grad_enabled(False):
+            input = self.mover(input)
+            pred = self.predictor(input)
+            return pred
     
     
     def validate(self, input, target):
@@ -102,9 +104,11 @@ class Supervisor(nn.Module):
                input (Tensor): the input tensor
                target (Tensor): the target tensor
         '''
-        input, target = self.mover(input), self.mover(target)
-        loss, pred = self(input, target)
-        return self.handle_metrics(loss.item(), pred, target)
+        self.eval()
+        with torch.set_grad_enabled(False):
+            input, target = self.mover(input), self.mover(target)
+            loss, pred = self(input, target)
+            return self.handle_metrics(loss.item(), pred, target)
 
     def learn(self, input, target):
         '''Perform a single learning step. This method is normally invoked by
@@ -116,14 +120,14 @@ class Supervisor(nn.Module):
            Args:
                input (Tensor): the input data
                target (Tensor): the target data
-               optim (Optimizer): the optimizer to use to update the model
-
         '''
-        self.step += 1
-        input, target = self.mover(input), self.mover(target)
-        loss, pred = self(input, target)
-        loss.backward()
-        return self.handle_metrics(loss.item(), pred, target)
+        self.train()
+        with torch.set_grad_enabled(True):
+            self.step += 1
+            input, target = self.mover(input), self.mover(target)
+            loss, pred = self(input, target)
+            loss.backward()
+            return self.handle_metrics(loss.item(), pred, target)
 
     def state_dict(self):
         return {
@@ -137,7 +141,8 @@ class Supervisor(nn.Module):
 
 
 class Trainer():
-    '''Train your supervised model using an optimizer.
+    '''Train your supervised model. After creating an instance of a Trainer,
+       you can start the training the model by invoking the `run` method.
 
        Args:
            model (Supervisor): the supervised model that needs to be trained
@@ -203,16 +208,14 @@ class Trainer():
            Args:
                data: the training data to use.
         '''
-        self.model.train()
-        with torch.set_grad_enabled(True):
-            steps_per_epoch = len(data)
-            for idx, (input, target) in enumerate(data):
-                output = self.model.learn(input, target)
-                self._update_meter(output)
-                self._handle_metrics()
-                self._update_model()
-                progress = (1. + idx) / steps_per_epoch
-                self._display_meter("train", progress)
+        steps_per_epoch = len(data)
+        for idx, (input, target) in enumerate(data):
+            output = self.model.learn(input, target)
+            self._update_meter(output)
+            self._handle_metrics()
+            self._update_model()
+            progress = (1. + idx) / steps_per_epoch
+            self._display_meter("train", progress)
 
     def validate(self, data):
         '''Validate the model using the data provided. Typically you
@@ -222,44 +225,10 @@ class Trainer():
            Args:
                data: the validation data to use.
         '''
-
-        self.model.eval()
-        with torch.set_grad_enabled(False):
-            for input, target in data:
-                output = self.model.validate(input, target)
-                self._update_meter(output, "val_")
-            self._display_meter("valid")
-
-    def predict(self, data, calculator=None):
-        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
-           like for example a dataloader or a numpy array. 
-           
-           If a collector function is provided this function is called after each batch 
-           to store/process the predictions. If this function is not provided, all the 
-           predictions are concatenated and returned as a numpy array.
-
-           Args:
-               data: the input data to use
-               calculator (Calculator): the calculator to invoke after each batch to process the predictions.
-                 if None is provided, the default behavior is to return all the results appended in one 
-                 large list.
-
-           Note: if you don't provide a calculator, all results are stored in memory. This can cause memory 
-           issues if you have a lot of data and large prediction tensors.
-        '''
-        result = []
-
-        if calculator is None:
-            calculator = CollectCalculator() 
-            
-        self.model.eval()
-        with torch.set_grad_enabled(False):
-            for input in data:
-                pred = self.model.predict(input)
-                calculator.add(pred)
-                               
-        return calculator.result()
-        
+        for input, target in data:
+            output = self.model.validate(input, target)
+            self._update_meter(output, "val_")
+        self._display_meter("valid")
 
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
@@ -297,6 +266,7 @@ class Trainer():
         self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
 
+        
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state
            but also the optimizer state and internal state. This makes it possible to
@@ -391,7 +361,7 @@ class Mover():
         return Mover(device)
 
     def __call__(self, batch):
-        '''Move a single batch to the device'''
+        '''Move a single batch to the correct device'''
 
         if torch.is_tensor(batch):
             return batch.to(device=self.device, non_blocking=self.non_blocking)
@@ -412,32 +382,3 @@ class Mover():
 
             
             
-class CollectCalculator():
-    '''Calculator suited for collecting Tensors and others values. If the value
-    that is added is PyTorch Tensor, it is detached and moved to a numpy structure. Otherwise 
-    the value is just added directly to the overall result.
-    
-    Since this calculator doesn't reduce the captured values, it can consume a lot of memory
-    based on the volume and size of the added values.
-    
-    Args:
-        sigmoid (bool): in case the value is a PyTorch Tensor, should a sigmoid be applied.
-    '''
-    
-    def __init__(self, sigmoid=False):
-        self.data=[]
-        self.sigmoid = sigmoid
-        
-    def add(self, pred):
-        if torch.is_tensor(pred):
-            if self.sigmoid:
-                pred = torch.sigmoid(pred)
-            self.data.extend(pred.cpu().detach().numpy())
-        else:
-            self.data.extend(pred)
-
-    def clear(self, pred):
-        self.data = []
-
-    def result(self):
-        return self.data
