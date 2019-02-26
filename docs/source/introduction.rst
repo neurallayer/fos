@@ -85,15 +85,15 @@ and the loss function::
 
     model = Supervisor(predictor, loss_fn)
 
-Under the hood, the forward of the supervisor would look something like this::
+Under the hood, the forward of the supervisor looks something like this::
 
     def forward(self, x, target):
         y_pred = predictor(x)
         loss   = loss_fn(y_pred, target)
         return loss
 
-The Supervisor has also additional methods to train and validate a batch and is used by the Trainer to train the model.
-It is the Supervisor responsibility to perform both the forward and backward step. And the Supervisor optionally invokes the additional metrics to get more insights how the model is performing. However is is the trainer that updates 
+The Supervisor also has additional methods to train and validate a batch and is used by the Trainer to train the model.
+It is the Supervisor responsibility to perform both the forward and backward step. And the Supervisor optionally invokes the additional metrics to get more insights how the model is performing. However it is the trainer that updates 
 the model by invoking `optimizer.step`.
 
 The provided Supervisor implementation can handle most scenarios, but you can alway extend it to 

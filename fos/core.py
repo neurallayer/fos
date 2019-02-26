@@ -362,8 +362,8 @@ def _find_latest_training(rootdir):
 class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the correct device. Normally
-       the default mover will be fine and you don't have to specify one when
-       you create the Trainer.
+       the default mover will be fine and you don't have to specify one 
+       explictely when you create the Supervisor.
 
        Args:
            device: The device to move the tensors to
@@ -373,8 +373,8 @@ class Mover():
        
        .. code-block:: python
 
-           mover    = Mover("cuda")
-           trainer  = Trainer(..., mover=mover)
+           mover    = Mover("cuda", non_blocking=False)
+           trainer  = Supervisor(..., mover=mover)
     '''
 
     def __init__(self, device, non_blocking=True):
@@ -396,7 +396,7 @@ class Mover():
         if torch.is_tensor(batch):
             return batch.to(device=self.device, non_blocking=self.non_blocking)
 
-        if isinstance(batch, list):
+        if isinstance(batch, (list, tuple)):
             batch = [self(row) for row in batch]
             return batch
 
