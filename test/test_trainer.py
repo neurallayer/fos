@@ -53,10 +53,22 @@ def test_trainer_state():
     trainer.load_state_dict(state)
     
     filename = "./tmp_file.dat"
-    trainer.save(filename)
-    trainer.load(filename)
+    result = trainer.save(filename)
+    assert result == filename
+    
+    result = trainer.load(filename)
+    assert result == filename
     os.remove(filename)
 
+    filename1 = trainer.save()
+    filename2 = trainer.load()
+    os.remove(filename1)
+    assert filename1 == filename2
+    dir1 = os.path.dirname(filename1)
+    os.rmdir(dir1)
+    dir1 = os.path.dirname(dir1)
+    os.rmdir(dir1)
+    
 def smart_metric(*args):
     return 1.
     

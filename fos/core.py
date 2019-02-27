@@ -292,6 +292,7 @@ class Trainer():
                 os.makedirs(subdir)
             filename = "{}trainer_{:08d}.pty".format(subdir, self.model.step)
         torch.save(self.state_dict(), filename)
+        return filename
 
     def load(self, filename=None):
         '''Restore previously stored training program.
@@ -310,6 +311,7 @@ class Trainer():
             filename = _find_latest_training("./models/")
 
         self.load_state_dict(torch.load(filename))
+        return filename
 
 
 def _find_latest_training(rootdir):
