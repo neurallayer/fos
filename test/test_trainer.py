@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fos import Supervisor, Trainer
 from fos.meters import MemoryMeter
+import os
 
 
 def get_predictor():
@@ -35,7 +36,39 @@ def test_trainer():
     trainer.validate(valid_data)
     assert trainer.epoch == 11
     
-    batch_size = 16
-    test_data = [torch.randn(batch_size, 10) for i in range(20)]
-    result = trainer.predict(test_data)
-    assert len(result) == len(test_data)*batch_size
+    trainer.run(data, valid_data, epochs=5)
+    assert trainer.epoch == 16
+    
+    
+def test_trainer_state():
+    predictor = get_predictor()
+    loss = F.mse_loss
+    optim = torch.optim.Adam(predictor.parameters())
+    model = Supervisor(predictor, loss)
+    meter = MemoryMeter()
+    trainer = Trainer(model, optim, meter)
+
+    state = trainer.state_dict()
+    trainer = Trainer(model, optim, meter)
+    trainer.load_state_dict(state)
+    
+    filename = "./tmp_file.dat"
+    trainer.save(filename)
+    trainer.load(filename)
+    os.remove(filename)
+
+def smart_metric(*args):
+    return 1.
+    
+def test_trainer_metrics():
+    predictor = get_predictor()
+    loss = F.mse_loss
+    optim = torch.optim.Adam(predictor.parameters())
+    model = Supervisor(predictor, loss)
+    meter = MemoryMeter()
+    trainer = Trainer(model, optim, meter, metrics={"test":smart_metric})
+ 
+    data = get_data(100)
+    trainer.run(data, data)
+    assert trainer.epoch == 1
+

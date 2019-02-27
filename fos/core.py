@@ -6,7 +6,7 @@ display the progress during the training.
 There are 3 classes in the core package:
 
 1) Supervisor, that creates a supervised model with a loss function
-2) Trainer, that will run the training including validation
+2) Trainer, that will run the training including the validation
 3) Mover, that will move tensors to a device like a GPU
 
 '''
