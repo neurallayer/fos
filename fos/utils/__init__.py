@@ -60,11 +60,11 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
         num_samples (int): number of samples to draw, default=len(dataset)
         low_mem (bool): if memory is sparse use this option to avoid
         allocating additional memory
-               
+
     Example usage:
-       
+
        .. code-block:: python
-       
+
             sampler = ScalableRandomSampler(dataset, num_samples=10000)
             data_loader = Dataloader(dataset, sampler=sampler, ...)
     """
@@ -105,9 +105,9 @@ class SmartOptimizer():
         clipper (tuple): clipping parameters as a tuple (max_norm, norm_type). See also
             `torch.nn.utils.clip_grad_norm_` for more details
         scheduler (Scheduler): the scheduler to use
-           
+
     Example usage:
-       
+
     .. code-block:: python
 
         smart_optim = SmartOptimizer(optim, clipper=(1,2), scheduler=my_scheduler)
@@ -133,8 +133,8 @@ class SmartOptimizer():
 
     @property
     def param_group(self):
-        return self.optim.param_group        
-           
+        return self.optim.param_group
+
     def add_param_group(self, param_group):
         self.optim.add_param_group(param_group)
 
@@ -163,7 +163,7 @@ class Skipper():
         the iterator is only run at every third epcoh.
 
     Example usage:
-       
+
     .. code-block:: python
 
         # Run the validation only every 5th epoch
@@ -190,22 +190,22 @@ class Skipper():
         self.cnt += 1
         return i
 
-    
+
 def init_random(seed=0, cudnn=False):
-    '''Initialize the random seeds for `torch` and `numpy` in order to improve 
-    reproducability. This makes for example the initialization of 
+    '''Initialize the random seeds for `torch` and `numpy` in order to improve
+    reproducability. This makes for example the initialization of
     weights in the different layers of the model reproducable.
-       
+
      Example usage:
-       
+
      .. code-block:: python
 
         init_random()
-       
+
     Args:
         seed (int): the seed to use. default = 0
-        cudnn (bool): should we also disable some of the smart (non deterministic) 
-        optimimalizations of CuDNN. This might impact performance, so only recommended if 
+        cudnn (bool): should we also disable some of the smart (non deterministic)
+        optimimalizations of CuDNN. This might impact performance, so only recommended if
         really required. default = False
     '''
     torch.manual_seed(0)

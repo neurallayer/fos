@@ -8,6 +8,7 @@ import logging
 
 from ..calc import AvgCalc
 
+
 class Meter():
     '''This is the interface that needs to be implemented
        by any meter.
@@ -77,9 +78,9 @@ class MultiMeter(Meter):
            meters: the meters that should be wrapped
 
        Example usage:
-       
+
        .. code-block:: python
-       
+
            meter1 = NotebookMeter()
            meter2 = TensorBoardMeter()
            meter = MultiMeter(meter1, meter2)
@@ -104,29 +105,29 @@ class MultiMeter(Meter):
     def display(self, ctx):
         for meter in self.meters:
             meter.display(ctx)
-            
+
     def state_dict(self):
         return [meter.state_dict() for meter in self.meters]
 
     def load_state_dict(self, state):
         if len(state) != len(self.meters):
-            logging.warning("Invalid state receive for MultiMeter, will reset only.")
+            logging.warning(
+                "Invalid state receive for MultiMeter, will reset only.")
             self.reset()
         else:
             for meter_state, meter in zip(state, self.meters):
                 meter.load_state_dict(meter_state)
-            
 
 
 class BaseMeter(Meter):
-    '''Base meter that provides a default implementation for the various methods except 
+    '''Base meter that provides a default implementation for the various methods except
        the display method. So a subclas has to implement the display method.
 
        Behaviour rules when creating an instance:
            1. If nothing is specified, it will record all metrics using the average
            calculator.
 
-            2. If only one or more exclude metrics are specifified, it will record all 
+            2. If only one or more exclude metrics are specifified, it will record all
             metrics except the ones listed in the exclude argument.
 
             3. If metrics are provided, only record those metrics and ignore other metrics.
@@ -140,9 +141,9 @@ class BaseMeter(Meter):
            exclude (list): list of metrics to ignore
 
        Example usage:
-       
+
        .. code-block:: python
-       
+
            meter = some_meter()
            meter = some_meter(metrics={"acc": MomentumMeter(), "val_acc": AvgMeter()})
            meter = some_meter(exclude=["vall_loss"])
@@ -285,14 +286,12 @@ class PrintMeter(BaseMeter):
             self.next = now + self.throttle
 
 
-            
-
 class MemoryMeter(BaseMeter):
     '''Meter that stores values in memory for later use.
        With the get_history method the values for a metric
        can be retrieved.
 
-       Since it stores everything in memory, this meter should be used 
+       Since it stores everything in memory, this meter should be used
        with care in order to avoid memory issues.
     '''
 
@@ -345,17 +344,17 @@ class TensorBoardMeter(BaseMeter):
        * dist of float or strings. Every element in the list will be 1 metric
        * float or values that convert to a float. This is the default if the other ones don't apply.
          In case this fails, the meter ignores the exception and the metric will not be logged.
-         
-         
+
+
       Args:
           writer: the writer to use for logging
-          prefix: any prefix to add to the metric name. This allows for metrics to be 
+          prefix: any prefix to add to the metric name. This allows for metrics to be
             grouped together in Tensorboard.
-            
+
        Example usage:
-       
+
        .. code-block:: python
-      
+
           writer = HistoryWriter("/tmp/runs/myrun")
           metrics = {"loss":AvgCalc(), "val_loss":AvgCalc()}
           meter = TensorBoardMeter(writer, metrics=metrics, prefix="metrics/")
@@ -402,11 +401,9 @@ class TensorBoardMeter(BaseMeter):
         self.updated = {}
 
 
-
-
 class VisdomMeter(BaseMeter):
     '''Visdom meter.
-    
+
        TODO: currently not functional.
     '''
 
@@ -415,15 +412,14 @@ class VisdomMeter(BaseMeter):
         self.vis = vis
         self.prefix = prefix
         self.graphs = {}
-        
+
     def _write(self, name, value, step):
-        update='append'
+        update = 'append'
         if name not in self.graphs:
             self.graphs = vis.line
-            
-        graph = self.graphs[name] 
+
+        graph = self.graphs[name]
         graph(x=step, y=value, update=update)
-        
 
     def display(self, name, step):
         for key, calculator in self.calculators.items():

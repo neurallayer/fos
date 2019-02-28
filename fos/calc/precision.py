@@ -6,7 +6,7 @@ class BaseMacroCalculator():
        to get the correct metrics.
 
        Example usage:
-       
+
        .. code-block:: python
 
             metric = TPMetrics()
@@ -64,7 +64,7 @@ class RecallCalculator(BaseMacroCalculator):
 
 class BetaCalculator(BaseMacroCalculator):
     '''Calculates F Beta score, default is F1 (beta=1)
-    
+
        Args:
            beta: the beta to use, default = 1
     '''

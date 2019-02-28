@@ -13,19 +13,19 @@ There are 3 classes in the core package:
 
 import time
 import os
+import logging
 import numpy as np
 import torch
 import torch.nn as nn
-import logging
 
 
 class Supervisor(nn.Module):
-    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from 
+    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from
        `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
        not typical, it is possible to have multiple trainers train the same model.
-       
+
        Besides the added loss function, also additional metrics can be specified to get insights into
-       the performance of model. Normally you won't call a supervisor directly but rather interact with 
+       the performance of model. Normally you won't call a supervisor directly but rather interact with
        an instance of the Trainer_ class.
 
        Args:
@@ -35,9 +35,9 @@ class Supervisor(nn.Module):
            mover: the mover to use. If None is specified, a default mover will be created to move
            tensors to the correct device
 
-           
+
        Example usage:
-       
+
        .. code-block:: python
 
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
@@ -49,7 +49,8 @@ class Supervisor(nn.Module):
         self.metrics = metrics if metrics is not None else {}
         self.loss_fn = loss_fn
         self.step = 0
-        self.mover = mover if mover is not None else Mover.get_default(predictor)
+        self.mover = mover if mover is not None else Mover.get_default(
+            predictor)
 
     def handle_metrics(self, loss, input, target):
         '''Invoke the configured metrics functions and return the result
@@ -81,7 +82,7 @@ class Supervisor(nn.Module):
 
     def predict(self, input):
         '''Predict a batch of data at once and return the result. No metrics
-           will be generated when predicting values. The data will be moved to the 
+           will be generated when predicting values. The data will be moved to the
            device using the configured mover.
 
            Args:
@@ -92,12 +93,11 @@ class Supervisor(nn.Module):
             input = self.mover(input)
             pred = self.predictor(input)
             return pred
-    
-    
+
     def validate(self, input, target):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value. The data will be moved to the 
+           with the loss value. The data will be moved to the
            device using the configured mover.
 
            Args:
@@ -114,7 +114,7 @@ class Supervisor(nn.Module):
         '''Perform a single learning step. This method is normally invoked by
            the trainer but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value. The data will be moved to the 
+           with the loss value. The data will be moved to the
            device using the configured mover.
 
            Args:
@@ -150,7 +150,7 @@ class Trainer():
            meter (Meter): what meter should be used to handle and display metrics
            metrics (dict): The model metrics (like gradients) that should be generated
             during training (model metrics are not applied during the validation phase)
-               
+
        Example usage:
 
        .. code-block:: python
@@ -266,7 +266,6 @@ class Trainer():
         self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
 
-        
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state
            but also the optimizer state and internal state. This makes it possible to
@@ -334,7 +333,7 @@ def _find_latest_training(rootdir):
 class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the correct device. Normally
-       the default mover will be fine and you don't have to specify one 
+       the default mover will be fine and you don't have to specify one
        explictely when you create the Supervisor.
 
        Args:
@@ -342,7 +341,7 @@ class Mover():
            non_blocking: Use a non-blocking operation (asynchronous move), default = True
 
        Example usage:
-       
+
        .. code-block:: python
 
            mover    = Mover("cuda", non_blocking=False)
@@ -380,7 +379,3 @@ class Mover():
             "This mover doesn't support batch of type %s",
             type(batch))
         return batch
-
-
-            
-            
