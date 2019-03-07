@@ -93,7 +93,7 @@ class Supervisor(nn.Module):
             input = self.mover(input)
             pred = self.predictor(input)
             return pred
-
+        
     def validate(self, input, target):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
@@ -230,6 +230,7 @@ class Trainer():
             self._update_meter(output, "val_")
         self._display_meter("valid")
 
+        
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped. If
@@ -250,6 +251,48 @@ class Trainer():
         finally:
             self.meter.reset()
 
+            
+    def predict(self, data, ignore_label=False, auto_flatten=True):
+        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
+           typically a PyTorch dataloader. 
+           
+           Args:
+               data: the input data to use
+               ingore_label: returns the dataloader a label/target value that should be ignored. This enables to 
+               use a dataloader that returns both the X and y values. 
+               auto_flatten: should the last dimension be flatten if that dimension is 1.
+
+           Note: All results are stored in memory. This can cause memory issues if you have a lot of data and 
+           large prediction tensors.
+        '''
+        result = None
+        for batch in data:
+            
+            if ignore_label:
+                batch = batch[0]
+
+            preds = self.model.predict(batch)
+
+            if torch.is_tensor(preds):
+                preds  = (preds,)
+
+            if result is None:
+                if not isinstance(preds, tuple):
+                    raise ValueError("Cannot handle result type ", type(preds))
+                else:
+                    result = [[] for _ in preds]
+
+            for r,p in zip(result, preds):
+                if auto_flatten and (p.shape[-1] == 1):
+                    p = p.flatten(-1)
+                r.extend(p.cpu().numpy())
+
+        if len(result) == 1:
+            return np.array(result[0])
+        else:
+            return np.array(result)
+
+            
     def state_dict(self):
         return {
             "epoch": self.epoch,

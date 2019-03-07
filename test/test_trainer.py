@@ -40,6 +40,20 @@ def test_trainer():
     assert trainer.epoch == 16
     
     
+def test_trainer_predict():
+    
+    predictor = get_predictor()
+    loss = F.mse_loss
+    optim = torch.optim.Adam(predictor.parameters())
+    model = Supervisor(predictor, loss)
+    meter = MemoryMeter()
+    trainer = Trainer(model, optim, meter)
+    
+    data = get_data(100)
+    result = trainer.predict(data, ignore_label=True)
+    assert len(result) == 100*16
+
+    
 def test_trainer_state():
     predictor = get_predictor()
     loss = F.mse_loss
