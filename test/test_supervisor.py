@@ -37,7 +37,7 @@ def test_supervisor_basic():
     y = model.predict(data[0])
     assert y is not None
     assert model.step == 0
-
+    
 
 def my_metric(y, t):
     assert y.shape == t.shape
@@ -78,3 +78,22 @@ def test_supervisor_train():
 
     output2 = model.learn(x, t)
     assert model.step == 2
+
+    
+def test_supervisor_state():
+    predictor = get_predictor()
+    loss = F.mse_loss
+    optim = torch.optim.Adam(predictor.parameters())
+    model = Supervisor(predictor, loss)
+
+    assert model.step == 0
+
+    x, t = get_data(1)[0]
+    model.learn(x, t)
+    assert model.step == 1
+
+    state = model.state_dict()
+    model = Supervisor(predictor, loss)
+    assert model.step == 0
+    model.load_state_dict(state)
+    assert model.step == 1

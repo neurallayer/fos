@@ -77,8 +77,9 @@ class ParamHistogram():
             value = self._get_np(value)
             name = self.prefix + name
             self.writer.add_histogram(name, value, step)
-        except:
+        except BaseException:
             logging.warning("ignored metric %s", name)
+
 
 def learning_rates(model, optim):
     '''Get the learning rates used by the optimizer. Comes in handy

@@ -3,13 +3,13 @@ import torch
 
 
 def get_normalization(dataloader, max_iter=None, feature_dim=1):
-    '''Calculates the mean and standard deviation for the data from a 
+    '''Calculates the mean and standard deviation for the data from a
     dataloader. The output can be used for normalizing the images
     before feeding them to a neural network.
 
     The dataloader should return either just the batch of tensors or
     a tuple/list of which the first element is the tensor.
-       
+
     Args:
         dataloader: The datalaoder you want to use to get the images
         max_iter: Limit the number of iterations. If None, all the iterations in the
@@ -18,11 +18,11 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
          feature_dim: which dimension has the features to normalize.
 
     Example usage:
-       
+
     .. code-block:: python
 
         # Image tensors with the format  NxCxWxH (PyTorch format)
-        n = get_normalization(image_loader, 1000, 1) 
+        n = get_normalization(image_loader, 1000, 1)
     '''
 
     s = 0.
@@ -51,4 +51,4 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
         s += np.std(data, axis=axis)
         m += np.mean(data, axis=axis)
 
-    return {"mean": m/step, "std": s/step}
+    return {"mean": m / step, "std": s / step}

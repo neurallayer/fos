@@ -3,14 +3,14 @@ class Freezer():
     '''Provides functionality to freeze/unfreeze parameters in a model based
     on their name. This comes in handy during transfer learning at
     the beginning of the training when you only want to train the newly added layers.
-       
+
     If you want to know the names of the paramters, use `freezer.summary()`.
 
     Args:
         model (nn.Module): the model you want to use.
 
     Example usage:
-       
+
     .. code-block:: python
 
         freezer = Freezer(my_model)

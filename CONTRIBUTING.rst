@@ -24,7 +24,7 @@ Once you finish implementing a feature or bugfix, please send a Pull Request to
 
 Unit testing
 ------------
-Fos testing is located under `test/`. Run the entire test suite with PyTest::
+FOS testing is located under `test/`. Run the entire test suite with PyTest::
 
     cd test
     pytest

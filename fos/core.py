@@ -6,53 +6,58 @@ display the progress during the training.
 There are 3 classes in the core package:
 
 1) Supervisor, that creates a supervised model with a loss function
-2) Trainer, that will run the training including validation
+2) Trainer, that will run the training including the validation
 3) Mover, that will move tensors to a device like a GPU
 
 '''
 
 import time
 import os
+import logging
 import numpy as np
 import torch
 import torch.nn as nn
-import logging
 
 
 class Supervisor(nn.Module):
-    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from 
+    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from
        `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
        not typical, it is possible to have multiple trainers train the same model.
-       
+
        Besides the added loss function, also additional metrics can be specified to get insights into
-       the performance of model. Normally you won't call a supervisor directly but rather interact with 
+       the performance of model. Normally you won't call a supervisor directly but rather interact with
        an instance of the Trainer_ class.
 
        Args:
            predictor (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
            metrics (dict): The metrics that should be evaluated during the training and validation
-           
+           mover: the mover to use. If None is specified, a default mover will be created to move
+           tensors to the correct device
+
+
        Example usage:
-       
+
        .. code-block:: python
 
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
-    def __init__(self, predictor, loss_fn, metrics=None):
+    def __init__(self, predictor, loss_fn, metrics=None, mover=None):
         super().__init__()
         self.predictor = predictor
         self.metrics = metrics if metrics is not None else {}
         self.loss_fn = loss_fn
         self.step = 0
+        self.mover = mover if mover is not None else Mover.get_default(
+            predictor)
 
     def handle_metrics(self, loss, input, target):
         '''Invoke the configured metrics functions and return the result
 
            Args:
                loss (scaler): the loss value
-               y (Tensor): the predicted value
+               input (Tensor): the predicted value
                target (Tensor): the target value
         '''
         output = {}
@@ -76,43 +81,53 @@ class Supervisor(nn.Module):
         return loss, pred
 
     def predict(self, input):
-        '''Predict a single batch of data and return the result. No metrics
-           will be generated when predicitng values.
+        '''Predict a batch of data at once and return the result. No metrics
+           will be generated when predicting values. The data will be moved to the
+           device using the configured mover.
 
            Args:
-               input (Tensor): the input tensor
+               input (Tensor): the batch of input tensors
         '''
-        pred = self.predictor(input)
-        return pred
-
+        self.eval()
+        with torch.set_grad_enabled(False):
+            input = self.mover(input)
+            pred = self.predictor(input)
+            return pred
+        
     def validate(self, input, target):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value.
+           with the loss value. The data will be moved to the
+           device using the configured mover.
 
            Args:
                input (Tensor): the input tensor
                target (Tensor): the target tensor
         '''
-        loss, pred = self(input, target)
-        return self.handle_metrics(loss.item(), pred, target)
+        self.eval()
+        with torch.set_grad_enabled(False):
+            input, target = self.mover(input), self.mover(target)
+            loss, pred = self(input, target)
+            return self.handle_metrics(loss.item(), pred, target)
 
     def learn(self, input, target):
         '''Perform a single learning step. This method is normally invoked by
            the trainer but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
-           with the loss value.
+           with the loss value. The data will be moved to the
+           device using the configured mover.
 
            Args:
                input (Tensor): the input data
                target (Tensor): the target data
-               optim (Optimizer): the optimizer to use to update the model
-
         '''
-        self.step += 1
-        loss, pred = self(input, target)
-        loss.backward()
-        return self.handle_metrics(loss.item(), pred, target)
+        self.train()
+        with torch.set_grad_enabled(True):
+            self.step += 1
+            input, target = self.mover(input), self.mover(target)
+            loss, pred = self(input, target)
+            loss.backward()
+            return self.handle_metrics(loss.item(), pred, target)
 
     def state_dict(self):
         return {
@@ -126,7 +141,8 @@ class Supervisor(nn.Module):
 
 
 class Trainer():
-    '''Train your supervised model using an optimizer.
+    '''Train your supervised model. After creating an instance of a Trainer,
+       you can start the training the model by invoking the `run` method.
 
        Args:
            model (Supervisor): the supervised model that needs to be trained
@@ -134,9 +150,7 @@ class Trainer():
            meter (Meter): what meter should be used to handle and display metrics
            metrics (dict): The model metrics (like gradients) that should be generated
             during training (model metrics are not applied during the validation phase)
-           mover: the mover to use. If None is specified, a default mover will be created to move
-            tensors to the correct device
-               
+
        Example usage:
 
        .. code-block:: python
@@ -147,13 +161,12 @@ class Trainer():
 
     '''
 
-    def __init__(self, model, optim, meter, metrics=None, mover=None):
+    def __init__(self, model, optim, meter, metrics=None):
         self.model = model
         self.optim = optim
         self.metrics = metrics if metrics is not None else {}
         self.epoch = 0
         self.id = str(int(time.time()))
-        self.mover = mover if mover is not None else Mover.get_default(model)
         self.meter = meter
 
     def _update_meter(self, output, prefix=""):
@@ -195,16 +208,14 @@ class Trainer():
            Args:
                data: the training data to use.
         '''
-        self.model.train()
-        with torch.set_grad_enabled(True):
-            steps_per_epoch = len(data)
-            for idx, (input, target) in enumerate(self.mover(data)):
-                output = self.model.learn(input, target)
-                self._update_meter(output)
-                self._handle_metrics()
-                self._update_model()
-                progress = (1. + idx) / steps_per_epoch
-                self._display_meter("train", progress)
+        steps_per_epoch = len(data)
+        for idx, (input, target) in enumerate(data):
+            output = self.model.learn(input, target)
+            self._update_meter(output)
+            self._handle_metrics()
+            self._update_model()
+            progress = (1. + idx) / steps_per_epoch
+            self._display_meter("train", progress)
 
     def validate(self, data):
         '''Validate the model using the data provided. Typically you
@@ -214,45 +225,12 @@ class Trainer():
            Args:
                data: the validation data to use.
         '''
+        for input, target in data:
+            output = self.model.validate(input, target)
+            self._update_meter(output, "val_")
+        self._display_meter("valid")
 
-        self.model.eval()
-        with torch.set_grad_enabled(False):
-            for input, target in self.mover(data):
-                output = self.model.validate(input, target)
-                self._update_meter(output, "val_")
-            self._display_meter("valid")
-
-    def predict(self, data, calculator=None):
-        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
-           like for example a dataloader or a numpy array. 
-           
-           If a collector function is provided this function is called after each batch 
-           to store/process the predictions. If this function is not provided, all the 
-           predictions are concatenated and returned as a numpy array.
-
-           Args:
-               data: the input data to use
-               calculator (Calculator): the calculator to invoke after each batch to process the predictions.
-                 if None is provided, the default behavior is to return all the results appended in one 
-                 large list.
-
-           Note: if you don't provide a calculator, all results are stored in memory. This can cause memory 
-           issues if you have a lot of data and large prediction tensors.
-        '''
-        result = []
-
-        if calculator is None:
-            calculator = CollectCalculator() 
-            
-        self.model.eval()
-        with torch.set_grad_enabled(False):
-            for input in self.mover(data):
-                pred = self.model.predict(input)
-                calculator.add(pred)
-                               
-        return calculator.result()
         
-
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped. If
@@ -273,6 +251,48 @@ class Trainer():
         finally:
             self.meter.reset()
 
+            
+    def predict(self, data, ignore_label=False, auto_flatten=True):
+        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
+           typically a PyTorch dataloader. 
+           
+           Args:
+               data: the input data to use
+               ingore_label: returns the dataloader a label/target value that should be ignored. This enables to 
+               use a dataloader that returns both the X and y values. 
+               auto_flatten: should the last dimension be flatten if that dimension is 1.
+
+           Note: All results are stored in memory. This can cause memory issues if you have a lot of data and 
+           large prediction tensors.
+        '''
+        result = None
+        for batch in data:
+            
+            if ignore_label:
+                batch = batch[0]
+
+            preds = self.model.predict(batch)
+
+            if torch.is_tensor(preds):
+                preds  = (preds,)
+
+            if result is None:
+                if not isinstance(preds, tuple):
+                    raise ValueError("Cannot handle result type ", type(preds))
+                else:
+                    result = [[] for _ in preds]
+
+            for r,p in zip(result, preds):
+                if auto_flatten and (p.shape[-1] == 1):
+                    p = p.flatten(-1)
+                r.extend(p.cpu().numpy())
+
+        if len(result) == 1:
+            return np.array(result[0])
+        else:
+            return np.array(result)
+
+            
     def state_dict(self):
         return {
             "epoch": self.epoch,
@@ -314,6 +334,7 @@ class Trainer():
                 os.makedirs(subdir)
             filename = "{}trainer_{:08d}.pty".format(subdir, self.model.step)
         torch.save(self.state_dict(), filename)
+        return filename
 
     def load(self, filename=None):
         '''Restore previously stored training program.
@@ -332,6 +353,7 @@ class Trainer():
             filename = _find_latest_training("./models/")
 
         self.load_state_dict(torch.load(filename))
+        return filename
 
 
 def _find_latest_training(rootdir):
@@ -354,19 +376,19 @@ def _find_latest_training(rootdir):
 class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the correct device. Normally
-       the default mover will be fine and you don't have to specify one when
-       you create the Trainer.
+       the default mover will be fine and you don't have to specify one
+       explictely when you create the Supervisor.
 
        Args:
            device: The device to move the tensors to
            non_blocking: Use a non-blocking operation (asynchronous move), default = True
 
        Example usage:
-       
+
        .. code-block:: python
 
-           mover    = Mover("cuda")
-           trainer  = Trainer(..., mover=mover)
+           mover    = Mover("cuda", non_blocking=False)
+           trainer  = Supervisor(..., mover=mover)
     '''
 
     def __init__(self, device, non_blocking=True):
@@ -382,14 +404,15 @@ class Mover():
         device = next(model.parameters()).device
         return Mover(device)
 
-    def move(self, batch):
-        '''Move a single batch to the device'''
+    def __call__(self, batch):
+        '''Move a single batch to the correct device'''
 
         if torch.is_tensor(batch):
             return batch.to(device=self.device, non_blocking=self.non_blocking)
 
-        if isinstance(batch, (tuple, list)):
-            return tuple([self.move(elem) for elem in batch])
+        if isinstance(batch, (list, tuple)):
+            batch = [self(row) for row in batch]
+            return batch
 
         if isinstance(batch, np.ndarray):
             batch = torch.from_numpy(batch)
@@ -399,39 +422,3 @@ class Mover():
             "This mover doesn't support batch of type %s",
             type(batch))
         return batch
-
-    def __call__(self, data):
-        for batch in data:
-            yield self.move(batch)
-
-            
-            
-class CollectCalculator():
-    '''Calculator suited for collecting Tensors and others values. If the value
-    that is added is PyTorch Tensor, it is detached and moved to a numpy structure. Otherwise 
-    the value is just added directly to the overall result.
-    
-    Since this calculator doesn't reduce the captured values, it can consume a lot of memory
-    based on the volume and size of the added values.
-    
-    Args:
-        sigmoid (bool): in case the value is a PyTorch Tensor, should a sigmoid be applied.
-    '''
-    
-    def __init__(self, sigmoid=False):
-        self.data=[]
-        self.sigmoid = sigmoid
-        
-    def add(self, pred):
-        if torch.is_tensor(pred):
-            if self.sigmoid:
-                pred = torch.sigmoid(pred)
-            self.data.extend(pred.cpu().detach().numpy())
-        else:
-            self.data.extend(pred)
-
-    def clear(self, pred):
-        self.data = []
-
-    def result(self):
-        return self.data

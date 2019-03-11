@@ -25,6 +25,7 @@ class Calculator():
            return the result.
         '''
 
+
 class RecentCalc(Calculator):
     '''Simple stores and returns the most recent value. So any new
        value added will overwrite the exisitng one.
