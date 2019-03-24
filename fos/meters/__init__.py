@@ -283,7 +283,7 @@ class PrintMeter(BaseMeter):
             for metric in metrics:
                     name, value = metric.get()
                     if value is not None:
-                        result += self._format(name, value)
+                        result += self._format(key, value)
             print(result)
             self.next = now + self.throttle
 
@@ -393,14 +393,12 @@ class TensorBoardMeter(BaseMeter):
         except BaseException:
             logging.warning("ignoring metric %s", name)
 
-    def display(self, ctx):
-        for key, calculator in self.metrics.items():
-            if key in self.updated:
-                value = calculator.result()
-                if value is not None:
-                    full_name = self.prefix + key
-                    self._write(full_name, value, ctx["step"])
-        self.updated = {}
+    def display(self, metrics, ctx):
+        for metric in metrics:
+            name, value = metric.get() 
+            if value is not None:
+                name = self.prefix + name
+                self._write(name, value, ctx["step"])
 
 
 class VisdomMeter(BaseMeter):

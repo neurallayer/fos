@@ -2,6 +2,43 @@ import logging
 import numpy as np
 
 
+class TrainMetric():
+    
+    def reset(self):
+        pass
+    
+    def update(self, model, optim):
+        pass
+    
+    def get(self):
+        pass
+    
+
+class LRMetric(TrainMetric):
+    
+    
+    def __init__(self):
+        self.state = None
+        self.name = "lr"
+    
+    def reset(self):
+        self.state = None
+    
+    def update(self, model, optim):   
+        self.state = []
+        for p in optim.param_groups:
+            self.state.append(p["lr"])
+
+    def get(self):
+        if self.state is None:
+            return self.name, None
+        
+        if len(self.state) == 1:
+            return self.name, self.state[0]
+        else:
+            return self.name, np.array(self.state)
+
+
 class ParamHistogram():
     '''Make histograms of the weights and gradients of the parameters
        in the model. This metric writes directly to a tensorboard file and
@@ -50,7 +87,7 @@ class ParamHistogram():
     def _get_np(param):
         return param.clone().detach().cpu().numpy()
 
-    def __call__(self, model, optim):
+    def update(self, model, optim):
 
         if (model.step % self.skip) != 0:
             return
@@ -70,7 +107,8 @@ class ParamHistogram():
                 name = "gradient/" + k
                 self._write(name, v.grad, supervisor.step)
 
-        return None
+    def get(self):
+        return "weigths", None
 
     def _write(self, name, value, step):
         try:

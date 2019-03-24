@@ -43,5 +43,5 @@ def test_paramhistogram():
     loss = Mock()
     model = Supervisor(predictor, loss)
     metric = ParamHistogram(include_gradient=False, predictor_only=False)
-    metric(model, None)
+    metric.update(model, None)
     assert writer.add_histogram.is_called()
