@@ -4,17 +4,27 @@ from unittest.mock import Mock
 from fos.meters import PrintMeter, MultiMeter, NotebookMeter, MemoryMeter, TensorBoardMeter
 
 
+class SmartMetric():
+    def reset(self):
+        pass
+    
+    def update(self, *args):
+        pass
+    
+    def get(self):
+        return "mymetric", 1.
+
+
 def init_meter(meter, steps):
+    metric = SmartMetric()
     for i in range(steps):
-        meter.update("loss", 1/(i+10))
-        meter.display({"phase":"train", "step": i+1, "epoch":1, "progress":0.5})
+        meter.display([metric], {"phase":"train", "step": i+1, "epoch":1, "progress":0.5})
     
     
 def test_printmeter():
     meter = PrintMeter()
     cnt = 10
     init_meter(meter, cnt) 
-    meter.reset()
     state = meter.state_dict()
     assert state == None
     
@@ -22,7 +32,6 @@ def test_multimeter():
     meter = MultiMeter(MemoryMeter(), MemoryMeter())
     cnt = 10
     init_meter(meter, cnt) 
-    meter.reset()
     state = meter.state_dict()
     assert len(state) == 2
 
@@ -31,7 +40,6 @@ def test_notebookmeter():
     meter.tqdm = Mock()
     cnt = 10
     init_meter(meter, cnt)
-    meter.reset()
     state = meter.state_dict()
     assert state == None
 
@@ -41,39 +49,30 @@ def test_memorymeter():
     cnt = 10
     init_meter(meter, cnt)
 
-    assert "loss" in meter.metrics
-    assert "val_loss" not in meter.metrics
 
-    steps, values = meter.get_history("loss")
+    steps, values = meter.get_history("mymetric")
     assert len(steps) == len(values)
     assert len(steps) == cnt
 
-    steps, values = meter.get_history("val_loss")
+    steps, values = meter.get_history("mymetric_")
     assert len(steps) == 0
-    
-    meter.update("val_loss", 0.6)
-    meter.display({"step": 3}) 
-    steps, values = meter.get_history("val_loss")
-    assert len(steps) == 1
-    assert values[0] == 0.6
     
     state = meter.state_dict()
     assert len(state) > 0
     
     meter.reset()
     meter.load_state_dict(state)
-    steps, values = meter.get_history("loss")
+    steps, values = meter.get_history("mymetric")
     assert len(steps) == len(values)
     assert len(steps) == cnt
 
     
-def test_tensorboardmeter():
+def _test_tensorboardmeter():
     writer = Mock()
     meter = TensorBoardMeter(writer=writer)
     init_meter(meter, 10)
     writer.add_scalar.assert_called()
     meter.reset()
-    assert meter.updated == {}
     init_meter(meter, 10)
     writer.add_scalar.assert_called()
 

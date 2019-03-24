@@ -17,6 +17,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+from fos.metrics import LossMetric
 
 
 class Supervisor(nn.Module):
@@ -46,13 +47,13 @@ class Supervisor(nn.Module):
     def __init__(self, predictor, loss_fn, metrics=None, mover=None):
         super().__init__()
         self.predictor = predictor
-        self.metrics = metrics if metrics is not None else {}
+        self.metrics = metrics if metrics is not None else []
         self.loss_fn = loss_fn
+        self.loss_metric = LossMetric()
         self.step = 0
-        self.mover = mover if mover is not None else Mover.get_default(
-            predictor)
+        self.mover = mover if mover is not None else Mover.get_default(predictor)
 
-    def handle_metrics(self, loss, input, target):
+    def update_metrics(self, loss, input, target):
         '''Invoke the configured metrics functions and return the result
 
            Args:
@@ -60,14 +61,17 @@ class Supervisor(nn.Module):
                input (Tensor): the predicted value
                target (Tensor): the target value
         '''
-        output = {}
+        self.loss_metric.update(loss, None)
+        for metric in self.metrics:
+            metric.update(input, target)
 
-        output["loss"] = loss
-        for key, fn in self.metrics.items():
-            value = fn(input, target)
-            if value is not None:
-                output[key] = value
-        return output
+    def get_metrics(self):
+        '''Get all the configured metrics'''
+        return [self.loss_metric] + self.metrics
+            
+    def reset_metrics(self):
+        for metric in self.get_metrics():
+            metric.reset()
 
     def forward(self, input, target):
         '''Implementation of the forward method in nn.Module
@@ -108,7 +112,7 @@ class Supervisor(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(input), self.mover(target)
             loss, pred = self(input, target)
-            return self.handle_metrics(loss.item(), pred, target)
+            return self.update_metrics(loss, pred, target)
 
     def learn(self, input, target):
         '''Perform a single learning step. This method is normally invoked by
@@ -127,7 +131,7 @@ class Supervisor(nn.Module):
             input, target = self.mover(input), self.mover(target)
             loss, pred = self(input, target)
             loss.backward()
-            return self.handle_metrics(loss.item(), pred, target)
+            return self.update_metrics(loss, pred, target)
 
     def state_dict(self):
         return {
@@ -164,14 +168,10 @@ class Trainer():
     def __init__(self, model, optim, meter, metrics=None):
         self.model = model
         self.optim = optim
-        self.metrics = metrics if metrics is not None else {}
+        self.metrics = metrics if metrics is not None else []
         self.epoch = 0
         self.id = str(int(time.time()))
         self.meter = meter
-
-    def _update_meter(self, output, prefix=""):
-        for key, value in output.items():
-            self.meter.update(prefix + key, value)
 
     def _display_meter(self, phase, progress=None):
         ctx = {
@@ -180,16 +180,16 @@ class Trainer():
             "phase": phase,
             "progress": progress
         }
-        self.meter.display(ctx)
+        metrics = self.model.get_metrics() + self.metrics
+        self.meter.display(metrics, ctx)
 
-    def _handle_metrics(self):
-        '''call the configured metrics and update the meters
+        
+    def update_metrics(self):
+        '''call the configured metrics and update them
            accordingly.
         '''
-        for key, fn in self.metrics.items():
-            value = fn(self.model, self.optim)
-            if value is not None:
-                self.meter.update(key, value)
+        for metric in self.metrics:
+            metric.update(self.model, self.optim)
 
     def _update_model(self):
         '''Update the model. At this point the model has performed both the
@@ -209,10 +209,10 @@ class Trainer():
                data: the training data to use.
         '''
         steps_per_epoch = len(data)
+        self.model.reset_metrics()
         for idx, (input, target) in enumerate(data):
-            output = self.model.learn(input, target)
-            self._update_meter(output)
-            self._handle_metrics()
+            self.model.learn(input, target)
+            self.update_metrics()
             self._update_model()
             progress = (1. + idx) / steps_per_epoch
             self._display_meter("train", progress)
@@ -225,9 +225,9 @@ class Trainer():
            Args:
                data: the validation data to use.
         '''
+        self.model.reset_metrics()
         for input, target in data:
-            output = self.model.validate(input, target)
-            self._update_meter(output, "val_")
+            self.model.validate(input, target)
         self._display_meter("valid")
 
         
@@ -302,12 +302,14 @@ class Trainer():
             "optim": self.optim.state_dict()
         }
 
+
     def load_state_dict(self, state):
         self.epoch = state["epoch"]
         self.id = state["id"]
         self.model.load_state_dict(state["model"])
         self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
+
 
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state
@@ -335,6 +337,7 @@ class Trainer():
             filename = "{}trainer_{:08d}.pty".format(subdir, self.model.step)
         torch.save(self.state_dict(), filename)
         return filename
+
 
     def load(self, filename=None):
         '''Restore previously stored training program.
