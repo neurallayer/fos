@@ -1,12 +1,13 @@
-import time
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
-import numpy as np
 from tqdm import tqdm
-import logging
-
+from ..core import Workout
 from ..calc import AvgCalc
+
+
+def _get_metrics2process(workout: Workout, metrics: [str]):
+    [m for m in metrics if workout.has_metric(m)]
 
 
 class Meter():
@@ -30,7 +31,7 @@ class Meter():
     '''
 
     @abstractmethod
-    def __call__(self, workout, phase):
+    def __call__(self, workout: Workout, phase: str):
         '''update the state of the meter with a certain metric and its value.
 
            Args:
@@ -40,23 +41,24 @@ class Meter():
 
 
 class SilentMeter(Meter):
+    '''Silently ignore all the metrics and don't produce any output'''
 
     def __call__(self, workout, phase):
         pass
 
 
-class PrintMeter2(Meter):
+class PrintMeter(Meter):
     '''Displays the metrics by using a simple print
-       statement.
+       statement the end of an epoch
 
-       If you use this is a shell script, please be aware that
+       If you use this in a shell script, please be aware that
        by default Python buffers the output. You can change this
        behaviour by using the `-u` option. See also:
 
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
 
        Args:
-           throttle (int): how often to print output, default is oncr every 3 seconds.
+           metrics: which metrics should be printed.
 
     '''
 
@@ -71,15 +73,16 @@ class PrintMeter2(Meter):
             result = " - {} : {} ".format(key, value)
         return result
 
-    def __call__(self, workout, phase):
-        if phase != "valid": return
+    def __call__(self, workout: Workout, phase: str):
+        if phase != "valid":
+            return
         result = "{:6}:{:6}".format(workout.epoch, workout.step)
         for metric in self.metrics:
+            if workout.has_metric(metric):
                 value = workout.get_metric(metric)
                 if value is not None:
                     result += self._format(metric, value)
         print(result)
-
 
 
 class MultiMeter(Meter):
@@ -105,7 +108,6 @@ class MultiMeter(Meter):
     def add(self, meter):
         '''Add a meter to this multimeter'''
         self.meters.append(meter)
-
 
     def reset(self):
         for meter in self.meters:
@@ -177,8 +179,6 @@ class BaseMeter(Meter):
 
         return None
 
-
-
     def update(self, key, value):
         calc = self._get_calc(key)
         if calc is not None:
@@ -233,7 +233,6 @@ class NotebookMeter(Meter):
                     key = "val_" + key
                 self.state[key] = value
 
-
     def display(self, metrics, ctx):
         progress = ctx["progress"]
 
@@ -256,51 +255,6 @@ class NotebookMeter(Meter):
             pb.set_description(result, refresh=False)
         else:
             pb.set_description(result)
-
-
-class PrintMeter(BaseMeter):
-    '''Displays the metrics by using a simple print
-       statement.
-
-       If you use this is a shell script, please be aware that
-       by default Python buffers the output. You can change this
-       behaviour by using the `-u` option. See also:
-
-       `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
-
-       Args:
-           throttle (int): how often to print output, default is oncr every 3 seconds.
-
-    '''
-
-    def __init__(self, metrics=None, exclude=None, throttle=3):
-        super().__init__(metrics, exclude)
-        self.throttle = throttle
-        self.next = -1
-
-    def reset(self):
-        super().reset()
-        self.next = -1
-
-    def _format(self, key, value):
-        try:
-            value = float(value)
-            result = "{}={:.6f} ".format(key, value)
-        except BaseException:
-            result = "{}={} ".format(key, value)
-        return result
-
-    def display(self, metrics, ctx):
-        now = time.time()
-        if now > self.next:
-            result = "{}:[{:6}] => ".format(ctx["phase"], ctx["step"])
-            for metric in metrics:
-                    name, value = metric.get()
-                    if value is not None:
-                        result += self._format(key, value)
-            print(result)
-            self.next = now + self.throttle
-
 
 
 class TensorBoardMeter(BaseMeter):
@@ -370,33 +324,3 @@ class TensorBoardMeter(BaseMeter):
             if value is not None:
                 name = self.prefix + name
                 self._write(name, value, ctx["step"])
-
-
-class VisdomMeter(BaseMeter):
-    '''Visdom meter.
-
-       TODO: currently not functional.
-    '''
-
-    def __init__(self, vis=None, metrics=None, exclude=None, prefix=""):
-        super().__init__(metrics, exclude)
-        self.vis = vis
-        self.prefix = prefix
-        self.graphs = {}
-
-    def _write(self, name, value, step):
-        update = 'append'
-        if name not in self.graphs:
-            self.graphs = vis.line
-
-        graph = self.graphs[name]
-        graph(x=step, y=value, update=update)
-
-    def display(self, name, step):
-        for key, calculator in self.calculators.items():
-            if key in self.updated:
-                value = calculator.result()
-                if value is not None:
-                    full_name = self.prefix + key
-                    self._write(full_name, value, step)
-        self.updated = {}

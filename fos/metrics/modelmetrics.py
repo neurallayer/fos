@@ -3,28 +3,27 @@ import numpy as np
 
 
 class TrainMetric():
-    
+
     def reset(self):
         pass
-    
+
     def update(self, model, optim):
         pass
-    
+
     def get(self):
         pass
-    
+
 
 class LRMetric(TrainMetric):
-    
-    
+
     def __init__(self):
         self.state = None
         self.name = "lr"
-    
+
     def reset(self):
         self.state = None
-    
-    def update(self, model, optim):   
+
+    def update(self, model, optim):
         self.state = []
         for p in optim.param_groups:
             self.state.append(p["lr"])
@@ -32,7 +31,7 @@ class LRMetric(TrainMetric):
     def get(self):
         if self.state is None:
             return self.name, None
-        
+
         if len(self.state) == 1:
             return self.name, self.state[0]
         else:
