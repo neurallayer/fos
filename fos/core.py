@@ -18,8 +18,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.jit import trace
+from enum import Enum
 
 from fos.metrics import LossMetric
+
+class Phase(Enum):
+    TRAIN = 1
+    VALID = 2
 
 
 class SmartReducer(dict):
@@ -33,10 +38,9 @@ class SmartReducer(dict):
 
     def __init__(self, momentum=0.9):
         super().__init__()
-        # self.state = dict()
         self.momentum = momentum
 
-    def __setitem__(self, step, value):
+    def __setitem__(self, step:int, value):
         if step in self:
             value = self.momentum * self[step] + (1-self.momentum) * value
         super().__setitem__(step, value)
@@ -79,20 +83,20 @@ class Workout(nn.Module):
         self.loss_fn = loss_fn
         self.mover = mover if mover is not None else Mover.get_default(model)
         self.history = {}
-        self.step  = 0
+        self.step = 0
         self.epoch = 0
         self.id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(model.parameters(), lr=1e-3)
 
 
-    def update_history(self, name, value):
+    def update_history(self, name:str, value):
         ''''Update the history for the passed metric name and value'''
         if not name in self.history:
             self.history[name] = SmartReducer()
         self.history[name][self.step] = value
 
 
-    def get_metricname(self, name, phase):
+    def get_metricname(self, name:str, phase:str):
         '''Get the fully qualified name for a metric. If phase equals train the
            metric name is as specified and if phase is "valid" the metric name
            is "val_" + name.
@@ -106,7 +110,7 @@ class Workout(nn.Module):
         return name if phase == "train" else "val_" + name
 
 
-    def update_metrics(self, loss, pred, target, phase):
+    def update_metrics(self, loss, pred, target, phase:str):
         '''Invoke the configured metrics functions and return the result
 
            Args:
