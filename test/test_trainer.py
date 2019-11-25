@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fos import Supervisor, Trainer
-from fos.meters import MemoryMeter
+from fos import Workout
+from fos.meters import SilentMeter
 import os
 
 
-def get_predictor():
+def get_model():
     return nn.Sequential(
         nn.Linear(10, 32),
         nn.ReLU(),
@@ -18,58 +18,51 @@ def get_data(steps):
 
 
 def test_trainer():
-    predictor = get_predictor()
+    model = get_model()
     loss = F.mse_loss
-    optim = torch.optim.Adam(predictor.parameters())
-    model = Supervisor(predictor, loss)
-    meter = MemoryMeter()
-    trainer = Trainer(model, optim, meter)
+    optim = torch.optim.Adam(model.parameters())
+    workout = Workout(model, loss, optim)
 
     data = get_data(100)
-    trainer.run(data)
+    workout.fit(data)
     assert trainer.epoch == 1
-    
-    trainer.run(data, epochs=10)
+
+    workout.fit(data, epochs=10)
     assert trainer.epoch == 11
-    
+
     valid_data = get_data(100)
-    trainer.validate(valid_data)
+    workout.validate(valid_data)
     assert trainer.epoch == 11
-    
-    trainer.run(data, valid_data, epochs=5)
+
+    workout.fit(data, valid_data, epochs=5)
     assert trainer.epoch == 16
-    
-    
+
+
 def test_trainer_predict():
-    
-    predictor = get_predictor()
+
+    model = get_model()
     loss = F.mse_loss
-    optim = torch.optim.Adam(predictor.parameters())
-    model = Supervisor(predictor, loss)
-    meter = MemoryMeter()
-    trainer = Trainer(model, optim, meter)
-    
+    optim = torch.optim.Adam(model.parameters())
+    workout = Workout(model, loss, optim)
+
     data = get_data(100)
-    result = trainer.predict(data, ignore_label=True)
+    result = workout.predict(data, ignore_label=True)
     assert len(result) == 100*16
 
-    
-def test_trainer_state():
-    predictor = get_predictor()
-    loss = F.mse_loss
-    optim = torch.optim.Adam(predictor.parameters())
-    model = Supervisor(predictor, loss)
-    meter = MemoryMeter()
-    trainer = Trainer(model, optim, meter)
 
-    state = trainer.state_dict()
-    trainer = Trainer(model, optim, meter)
-    trainer.load_state_dict(state)
-    
+def test_trainer_state():
+    model = get_model()
+    loss = F.mse_loss
+    workout = Workout(model, loss)
+
+    state = workout.state_dict()
+    workout = Workout(model, loss)
+    workout.load_state_dict(state)
+
     filename = "./tmp_file.dat"
     result = trainer.save(filename)
     assert result == filename
-    
+
     result = trainer.load(filename)
     assert result == filename
     os.remove(filename)
@@ -82,28 +75,27 @@ def test_trainer_state():
     os.rmdir(dir1)
     dir1 = os.path.dirname(dir1)
     os.rmdir(dir1)
-    
-    
+
+
 class SmartMetric():
     def reset(self):
         pass
-    
+
     def update(self, *args):
         pass
-    
+
     def get(self):
         return "mymetric", 1.
 
-    
+
 def test_trainer_metrics():
-    predictor = get_predictor()
+    model = get_model()
     loss = F.mse_loss
-    optim = torch.optim.Adam(predictor.parameters())
-    model = Supervisor(predictor, loss)
+    optim = torch.optim.Adam(model.parameters())
+    model = Workout(model, loss)
     meter = MemoryMeter()
     trainer = Trainer(model, optim, meter, metrics=[SmartMetric()])
- 
+
     data = get_data(100)
     trainer.run(data, data)
     assert trainer.epoch == 1
-

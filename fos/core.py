@@ -21,7 +21,33 @@ from torch.jit import trace
 
 from fos.metrics import LossMetric
 
-class Workout:
+
+class SmartReducer(dict):
+    '''Stores the values of a metric. In essence it is a dictionary with the key being
+    the step when the metric was recorded and the value being the metric value itself.
+
+    If multiple values per step are received (like is the case with validation),
+    the moving average of the metric values are stored instead. The default momentum
+    for the moving average is 0.9.
+    '''
+
+    def __init__(self, momentum=0.9):
+        super().__init__()
+        # self.state = dict()
+        self.momentum = momentum
+
+    def __setitem__(self, step, value):
+        if step in self:
+            value = self.momentum * self[step] + (1-self.momentum) * value
+        super().__setitem__(step, value)
+
+
+
+def empty_cb(*args):
+    pass
+
+
+class Workout(nn.Module):
     '''Supervisor extends a regular PyTorch model with a loss function. This class extends from
        `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
        not typical, it is possible to have multiple trainers train the same model.
@@ -31,9 +57,10 @@ class Workout:
        an instance of the Trainer_ class.
 
        Args:
-           predictor (nn.Module): The model that needs to be trained.
+           model (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
-           metrics (dict): The metrics that should be evaluated during the training and validation
+           optim: The optimizer to use. If none is provided, SGD will be used
+           metrics : The metrics that should be evaluated during the training and validation
            mover: the mover to use. If None is specified, a default mover will be created to move
            tensors to the correct device
 
@@ -45,21 +72,40 @@ class Workout:
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
-    def __init__(self, model, loss_fn,  optim=None, **metrics):
+    def __init__(self, model, loss_fn, optim=None, mover=None, **metrics):
         super().__init__()
         self.model = model
         self.metrics = metrics
         self.loss_fn = loss_fn
+        self.mover = mover if mover is not None else Mover.get_default(model)
         self.history = {}
-        self.loss_metric = LossMetric()
         self.step  = 0
         self.epoch = 0
-        self.optim = optim if optim is not None else torch.optim.SGD(model.params)
+        self.id = str(int(time.time()))
+        self.optim = optim if optim is not None else torch.optim.SGD(model.parameters(), lr=1e-3)
 
-        
-    def get_metricname(name, phase):
-        return name if phase == "train" else "valid_" + name
-        
+
+    def update_history(self, name, value):
+        ''''Update the history for the passed metric name and value'''
+        if not name in self.history:
+            self.history[name] = SmartReducer()
+        self.history[name][self.step] = value
+
+
+    def get_metricname(self, name, phase):
+        '''Get the fully qualified name for a metric. If phase equals train the
+           metric name is as specified and if phase is "valid" the metric name
+           is "val_" + name.
+
+           So for example wehn performing a trianing cycle with validaiton step
+           the following two loss metrics will be availble:
+
+           "loss" : for the recorded loss during training
+           "val_loss": or the recorded loss during validation
+        '''
+        return name if phase == "train" else "val_" + name
+
+
     def update_metrics(self, loss, pred, target, phase):
         '''Invoke the configured metrics functions and return the result
 
@@ -68,20 +114,26 @@ class Workout:
                pred (Tensor): the predicted value
                target (Tensor): the target value
         '''
-        self.update_history(self.get_metricname("loss",phase), loss)
-        for name,fn in self.metrics:
+        loss_name = self.get_metricname("loss", phase)
+        self.update_history(loss_name, loss.item())
+        for name,fn in self.metrics.items():
             value = fn(pred, target)
-            fqname = self.get_metricname(name,phase)
+            fqname = self.get_metricname(name, phase)
             self.update_history(fqname, value)
 
 
     def get_metrics(self):
-        '''Get all the configured metrics'''
-        return [self.loss_metric] + self.metrics
-            
-    def reset_metrics(self):
-        for metric in self.get_metrics():
-            metric.reset()
+        '''Get all metrics that have at least one value logged'''
+        return self.history.keys()
+
+    def get_metric(self, name, step=None):
+        '''Get the metric value for the provided metric name and step.
+            If no step is provided, the last workout step is used.
+        '''
+        step = step if step is not None else self.step
+        return self.history[name][step]
+        return self.history[name].state[step]
+
 
     def forward(self, input, target):
         '''Implementation of the forward method in nn.Module
@@ -90,24 +142,24 @@ class Workout:
                input (Tensor): the input data for the model
                target (Tensor): the target data for the loss function
         '''
-        pred = self.model(input)    
+        pred = self.model(input)
         loss = self.loss_fn(pred, target)
         return loss, pred
 
-    
+
     def trace(self, input):
-        '''Create a traced model and return it. 
+        '''Create a traced model and return it.
 
            Args:
                input (Tensor): a batch of input tensors
         '''
-        self.train()
+        self.model.train()
         with torch.set_grad_enabled(False):
             input = self.mover(input)
-            traced_model = trace(self.predictor, example_inputs=input, check_trace=False)
+            traced_model = trace(self.model, example_inputs=input, check_trace=False)
             return traced_model
 
-    
+
     def predict(self, input):
         '''Predict a batch of data at once and return the result. No metrics
            will be generated when predicting values. The data will be moved to the
@@ -116,62 +168,68 @@ class Workout:
            Args:
                input (Tensor): the batch of input tensors
         '''
-        self.eval()
+        self.model.eval()
         with torch.set_grad_enabled(False):
             input = self.mover(input)
-            pred = self.predictor(input)
+            pred = self.model(input)
             return pred
-        
-    def validate(self, input, target):
+
+    def validate(self, minibatch):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value. The data will be moved to the
            device using the configured mover.
 
            Args:
-               input (Tensor): the input tensor
-               target (Tensor): the target tensor
+               minibatch: the input and target tensor as a tuple
         '''
         self.eval()
         with torch.set_grad_enabled(False):
-            input, target = self.mover(input), self.mover(target)
+            input, target = self.mover(minibatch)
             loss, pred = self(input, target)
-            return self.update_metrics(loss, pred, target)
+            return self.update_metrics(loss, pred, target, "valid")
 
-    def step(self, input, target):
+    def update(self, minibatch):
         '''Perform a single learning step. This method is normally invoked by
-           the fit but can also be invoked directly. If there are metrics
+           the train method but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value. The data will be moved to the
            device using the configured mover.
 
            Args:
-               input (Tensor): the input data
-               target (Tensor): the target data
+               minibatch: the input and target tensor as a tuple
         '''
-        self.train()
+        self.model.train()
         with torch.set_grad_enabled(True):
-            input, target = self.mover(input), self.mover(target)
+            input, target = self.mover(minibatch)
             loss, pred = self(input, target)
             loss.backward()
             self.optim.step()
             self.step += 1
-            self.update_metrics(loss, pred, target)
+            self.update_metrics(loss, pred, target, "train")
             self.optim.zero_grad()
 
 
     def state_dict(self):
         return {
             "step": self.step,
-            "predictor": self.predictor.state_dict()
+            "id" : self.id,
+            "model": self.model.state_dict(),
+            "epoch": self.epoch,
+            "history": self.history,
+            "optim": self.optim.state_dict()
         }
 
     def load_state_dict(self, state):
+        self.id = state["id"]
         self.step = state["step"]
-        self.predictor.load_state_dict(state["predictor"])
-        
-        
-    def fit(self, data, valid_data=None, epochs=1):
+        self.epoch = state["epoch"]
+        self.history = state["history"]
+        self.model.load_state_dict(state["model"])
+        self.optim.load_state_dict(state["optim"])
+
+
+    def fit(self, data, valid_data=None, epochs=1, cb=empty_cb):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped. If
            the validaiton should not run every epoch, check the `Skipper` class.
@@ -181,22 +239,66 @@ class Workout:
                valid_data: the data to use for the validation, default = None.
                epochs (int): the number of epochs to run the training for, default = 1
         '''
-        try:
-            for _ in range(epochs):
-                self.epoch += 1
-                for minibatch in data:
-                    self.step(self.mover(minibatch))
-                    cb(self, "train")
-                if valid_data is not None:
-                    for minibatch in valid_data:
-                        self.validate(self.mover(valid_data))
-                self.updatemetric("epoch")
-                cb(self, "valid")
-                
-        finally:
-            self.meter.reset()
+
+        for _ in range(epochs):
+            self.epoch += 1
+            for minibatch in data:
+                self.update(minibatch)
+                cb(self, "train")
+            if valid_data is not None:
+                for minibatch in valid_data:
+                    self.validate(minibatch)
+            self.update_history("epoch", self.epoch)
+            cb(self, "valid")
 
 
+
+    def save(self, filename=None):
+        '''Save the training state to a file. This includes the underlying model state
+           but also the optimizer state and internal state. This makes it possible to
+           continue training where it was left off.
+
+           Please note::
+               This method doesn't store the model itself, just the trained parameters.
+               It is recommended to use regular version control like `git` to save
+               different versions of the code that creates the model.
+
+           If no filename is provide, a directory and filename will be generated using
+           the following pattern:
+
+                   `./models/[workout.id]/workout_[model.step].pty`
+
+           Args:
+               filename (str): the name of the file to store the training state.
+        '''
+
+        if filename is None:
+            subdir = "./models/{}/".format(self.id)
+            if not os.path.exists(subdir):
+                os.makedirs(subdir)
+            filename = "{}workout_{:08d}.pty".format(subdir, self.step)
+        torch.save(self.state_dict(), filename)
+        return filename
+
+
+    def load(self, filename=None):
+        '''Restore previously stored training program.
+
+           If no filename is provided it will try to find the last stored training
+           file and will use that one. The algoritm assumed that directories
+           and files can be sorted based on its name to find the latest version. This is
+           true is you use the let Fos determine the filename, but might not be the case
+           if you provided your own filename during the `trainer.save` method.
+
+           Args:
+               filename (str): The filename of the training state to load.
+        '''
+
+        if filename is None:
+            filename = _find_latest_training("./models/")
+
+        self.load_state_dict(torch.load(filename))
+        return filename
 
 
 
@@ -239,7 +341,7 @@ class Trainer():
         metrics = self.model.get_metrics() + self.metrics
         self.meter.display(metrics, ctx)
 
-        
+
     def update_metrics(self):
         '''call the configured metrics and update them
            accordingly.
@@ -253,7 +355,7 @@ class Trainer():
         `optimizer.step()` to perform the updates and afterwards reset the
         gradients with `optimizer.zero_grad()`.
         '''
-     
+
 
     def train(self, data):
         '''Train the model using the training data provided. Typically you
@@ -285,7 +387,7 @@ class Trainer():
             self.model.validate(input, target)
         self._display_meter("valid")
 
-        
+
     def run(self, data, valid_data=None, epochs=1):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped. If
@@ -306,23 +408,23 @@ class Trainer():
         finally:
             self.meter.reset()
 
-            
+
     def predict(self, data, ignore_label=False, auto_flatten=True):
-        '''Predict the outcome given the provided input data. Data is expected to be an iterable, 
-           typically a PyTorch dataloader. 
-           
+        '''Predict the outcome given the provided input data. Data is expected to be an iterable,
+           typically a PyTorch dataloader.
+
            Args:
                data: the input data to use
-               ingore_label: returns the dataloader a label/target value that should be ignored. This enables to 
-               use a dataloader that returns both the X and y values. 
+               ingore_label: returns the dataloader a label/target value that should be ignored. This enables to
+               use a dataloader that returns both the X and y values.
                auto_flatten: should the last dimension be flatten if that dimension is 1.
 
-           Note: All results are stored in memory. This can cause memory issues if you have a lot of data and 
+           Note: All results are stored in memory. This can cause memory issues if you have a lot of data and
            large prediction tensors.
         '''
         result = None
         for batch in data:
-            
+
             if ignore_label:
                 batch = batch[0]
 
@@ -347,7 +449,7 @@ class Trainer():
         else:
             return np.array(result)
 
-            
+
     def state_dict(self):
         return {
             "epoch": self.epoch,
@@ -435,7 +537,7 @@ class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the correct device. Normally
        the default mover will be fine and you don't have to specify one
-       explictely when you create the Supervisor.
+       explictely when you create the Workout.
 
        Args:
            device: The device to move the tensors to
@@ -446,7 +548,7 @@ class Mover():
        .. code-block:: python
 
            mover    = Mover("cuda", non_blocking=False)
-           trainer  = Supervisor(..., mover=mover)
+           trainer  = Workout(..., mover=mover)
     '''
 
     def __init__(self, device, non_blocking=True):
@@ -477,6 +579,6 @@ class Mover():
             return batch.to(device=self.device, non_blocking=self.non_blocking)
 
         logging.warning(
-            "This mover doesn't support batch of type %s",
+            "This mover doesn't support batch elements of type %s",
             type(batch))
         return batch

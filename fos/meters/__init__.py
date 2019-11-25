@@ -30,44 +30,56 @@ class Meter():
     '''
 
     @abstractmethod
-    def reset(self):
-        '''Reset the state kept by the meter. If a meter uses calculators
-           the meter will typically also invoke calculator.clear() to ensure they
-           are also cleared.
-        '''
-
-    @abstractmethod
-    def update(self, key, value):
+    def __call__(self, workout, phase):
         '''update the state of the meter with a certain metric and its value.
 
            Args:
-               key (str): the name of the metric
-               valaue: the value of the metric
+               workout (str): the workout
+               phase: the phase (trianing or validation)
         '''
 
-    @abstractmethod
-    def display(self, metrics, ctx):
-        '''display the values of the meter. Display can visual (to standard out or a notebook),
-           but also to a file or database.
 
-           Args:
-               ctx (dict): The context including values for steps and epochs.
-        '''
+class SilentMeter(Meter):
 
-    def state_dict(self):
-        '''get the internal state of the meter. The default implementation
-        assumes the meter is stateless.
-        '''
-        return None
+    def __call__(self, workout, phase):
+        pass
 
-    def load_state_dict(self, state):
-        '''Load a previous state into the meter. The default implementation
-        assumes the meter is stateless and just invokes reset.
 
-        Args:
-            state: the state to be loaded
-        '''
-        self.reset()
+class PrintMeter2(Meter):
+    '''Displays the metrics by using a simple print
+       statement.
+
+       If you use this is a shell script, please be aware that
+       by default Python buffers the output. You can change this
+       behaviour by using the `-u` option. See also:
+
+       `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
+
+       Args:
+           throttle (int): how often to print output, default is oncr every 3 seconds.
+
+    '''
+
+    def __init__(self, metrics=["loss", "val_loss"]):
+        self.metrics = metrics
+
+    def _format(self, key, value):
+        try:
+            value = float(value)
+            result = " - {} : {:.6f} ".format(key, value)
+        except BaseException:
+            result = " - {} : {} ".format(key, value)
+        return result
+
+    def __call__(self, workout, phase):
+        if phase != "valid": return
+        result = "{:6}:{:6}".format(workout.epoch, workout.step)
+        for metric in self.metrics:
+                value = workout.get_metric(metric)
+                if value is not None:
+                    result += self._format(metric, value)
+        print(result)
+
 
 
 class MultiMeter(Meter):
@@ -94,7 +106,7 @@ class MultiMeter(Meter):
         '''Add a meter to this multimeter'''
         self.meters.append(meter)
 
- 
+
     def reset(self):
         for meter in self.meters:
             meter.reset()
@@ -165,6 +177,8 @@ class BaseMeter(Meter):
 
         return None
 
+
+
     def update(self, key, value):
         calc = self._get_calc(key)
         if calc is not None:
@@ -215,22 +229,22 @@ class NotebookMeter(Meter):
         for metric in metrics:
             key, value = metric.get()
             if value is not None:
-                if phase == "valid": 
+                if phase == "valid":
                     key = "val_" + key
                 self.state[key] = value
 
 
     def display(self, metrics, ctx):
         progress = ctx["progress"]
-        
+
         if progress is not None:
             rel_progress = int(progress * 100) - self.last
             # Avoid updating too often.
             if (progress != 1.0) and (rel_progress == 0):
                 return
-            
+
         self._process_metrics(metrics, ctx["phase"])
-                
+
         result = "[{:3}:{:6}] ".format(ctx["epoch"], ctx["step"])
         for key, value in self.state.items():
             result += self.format(key, value)
@@ -287,49 +301,6 @@ class PrintMeter(BaseMeter):
             print(result)
             self.next = now + self.throttle
 
-
-class MemoryMeter(Meter):
-    '''Meter that stores values in memory for later use.
-       With the get_history method the values for a metric
-       can be retrieved.
-
-       Since it stores everything in memory, this meter should be used
-       with care in order to avoid memory issues.
-    '''
-
-    def __init__(self):
-        super().__init__()
-        self.history = []
-
-    def get_history(self, name, min_step=0):
-        '''Get the history for one of the stored metrics.
-
-           Arguments:
-               name: the name of the metric
-               min_step: the minimum step where to start collecting the
-                stored history.
-        '''
-        result = []
-        steps = []
-        for (step, key, value) in self.history:
-            if (step >= min_step) and (name == key) and (value is not None):
-                result.append(value)
-                steps.append(step)
-        return steps, result
-
-    def display(self, metrics, ctx):
-        for metric in metrics:
-            key, value = metric.get()
-            if value is not None:
-                if ctx["phase"] == "valid":
-                    key = "val_" + key
-                self.history.append((ctx["step"], key, value))
- 
-    def state_dict(self):
-        return self.history
-
-    def load_state_dict(self, state):
-        self.history = state
 
 
 class TensorBoardMeter(BaseMeter):
@@ -395,7 +366,7 @@ class TensorBoardMeter(BaseMeter):
 
     def display(self, metrics, ctx):
         for metric in metrics:
-            name, value = metric.get() 
+            name, value = metric.get()
             if value is not None:
                 name = self.prefix + name
                 self._write(name, value, ctx["step"])
