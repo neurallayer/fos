@@ -257,7 +257,7 @@ class NotebookMeter(Meter):
             pb.set_description(result)
 
 
-class TensorBoardMeter(BaseMeter):
+class TensorBoardMeter(Meter):
     '''Log the metrics to a tensorboard file so they can be reviewed
        in tensorboard. Currently supports the following type for metrics:
 
@@ -288,9 +288,10 @@ class TensorBoardMeter(BaseMeter):
           ...
     '''
 
-    def __init__(self, writer=None, metrics=None, exclude=None, prefix=""):
-        super().__init__(metrics, exclude)
+    def __init__(self, writer=None, metrics=["loss", "val_loss"], prefix=""):
+        super().__init__()
         self.writer = writer
+        self.metrics = metrics
         self.prefix = prefix
 
     def set_writer(self, writer):
@@ -318,9 +319,9 @@ class TensorBoardMeter(BaseMeter):
         except BaseException:
             logging.warning("ignoring metric %s", name)
 
-    def display(self, metrics, ctx):
-        for metric in metrics:
-            name, value = metric.get()
+    def __call__(self, workout, phase):
+        for metric in self.metrics:
+            value = workout.get_metric(metric)
             if value is not None:
-                name = self.prefix + name
-                self._write(name, value, ctx["step"])
+                name = self.prefix + metric
+                self._write(name, value, workout.step)
