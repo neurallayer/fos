@@ -83,8 +83,17 @@ def test_trainer_state():
     dir1 = os.path.dirname(dir1)
     os.rmdir(dir1)
     
-def smart_metric(*args):
-    return 1.
+    
+class SmartMetric():
+    def reset(self):
+        pass
+    
+    def update(self, *args):
+        pass
+    
+    def get(self):
+        return "mymetric", 1.
+
     
 def test_trainer_metrics():
     predictor = get_predictor()
@@ -92,7 +101,7 @@ def test_trainer_metrics():
     optim = torch.optim.Adam(predictor.parameters())
     model = Supervisor(predictor, loss)
     meter = MemoryMeter()
-    trainer = Trainer(model, optim, meter, metrics={"test":smart_metric})
+    trainer = Trainer(model, optim, meter, metrics=[SmartMetric()])
  
     data = get_data(100)
     trainer.run(data, data)

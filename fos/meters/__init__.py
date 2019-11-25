@@ -46,7 +46,7 @@ class Meter():
         '''
 
     @abstractmethod
-    def display(self, ctx):
+    def display(self, metrics, ctx):
         '''display the values of the meter. Display can visual (to standard out or a notebook),
            but also to a file or database.
 
@@ -94,17 +94,14 @@ class MultiMeter(Meter):
         '''Add a meter to this multimeter'''
         self.meters.append(meter)
 
-    def update(self, key, value):
-        for meter in self.meters:
-            meter.update(key, value)
-
+ 
     def reset(self):
         for meter in self.meters:
             meter.reset()
 
-    def display(self, ctx):
+    def display(self, metrics, ctx):
         for meter in self.meters:
-            meter.display(ctx)
+            meter.display(metrics, ctx)
 
     def state_dict(self):
         return [meter.state_dict() for meter in self.meters]
@@ -199,13 +196,6 @@ class NotebookMeter(Meter):
                 bar_format=self.bar_format)
         return self.tqdm
 
-    def update(self, key, value):
-        if key not in self.calculators:
-            self.calculators[key] = AvgCalc()
-
-        calc = self.calculators[key]
-        calc.add(value)
-
     def format(self, key, value):
         try:
             value = float(value)
@@ -215,26 +205,40 @@ class NotebookMeter(Meter):
         return result
 
     def reset(self):
-        self.calculators = OrderedDict()
+        self.state = OrderedDict()
         self.last = 0
         if self.tqdm is not None:
             self.tqdm.close()
             self.tqdm = None
 
-    def display(self, ctx):
-        result = "[{:3}:{:6}] ".format(ctx["epoch"], ctx["step"])
-        for key, calculator in self.calculators.items():
-            value = calculator.result()
+    def _process_metrics(self, metrics, phase):
+        for metric in metrics:
+            key, value = metric.get()
             if value is not None:
-                result += self.format(key, value)
+                if phase == "valid": 
+                    key = "val_" + key
+                self.state[key] = value
 
-        pb = self._get_tqdm()
+
+    def display(self, metrics, ctx):
         progress = ctx["progress"]
+        
         if progress is not None:
             rel_progress = int(progress * 100) - self.last
-            if rel_progress > 0:
-                pb.update(rel_progress)
-                self.last = int(progress * 100)
+            # Avoid updating too often.
+            if (progress != 1.0) and (rel_progress == 0):
+                return
+            
+        self._process_metrics(metrics, ctx["phase"])
+                
+        result = "[{:3}:{:6}] ".format(ctx["epoch"], ctx["step"])
+        for key, value in self.state.items():
+            result += self.format(key, value)
+
+        pb = self._get_tqdm()
+        if progress is not None:
+            pb.update(rel_progress)
+            self.last = int(progress * 100)
             pb.set_description(result, refresh=False)
         else:
             pb.set_description(result)
@@ -272,21 +276,19 @@ class PrintMeter(BaseMeter):
             result = "{}={} ".format(key, value)
         return result
 
-    def display(self, ctx):
+    def display(self, metrics, ctx):
         now = time.time()
         if now > self.next:
             result = "{}:[{:6}] => ".format(ctx["phase"], ctx["step"])
-            for key, calculator in self.metrics.items():
-                if key in self.updated:
-                    value = calculator.result()
+            for metric in metrics:
+                    name, value = metric.get()
                     if value is not None:
                         result += self._format(key, value)
             print(result)
-            self.updated = {}
             self.next = now + self.throttle
 
 
-class MemoryMeter(BaseMeter):
+class MemoryMeter(Meter):
     '''Meter that stores values in memory for later use.
        With the get_history method the values for a metric
        can be retrieved.
@@ -295,8 +297,8 @@ class MemoryMeter(BaseMeter):
        with care in order to avoid memory issues.
     '''
 
-    def __init__(self, metrics=None, exclude=None):
-        super().__init__(metrics, exclude)
+    def __init__(self):
+        super().__init__()
         self.history = []
 
     def get_history(self, name, min_step=0):
@@ -315,14 +317,14 @@ class MemoryMeter(BaseMeter):
                 steps.append(step)
         return steps, result
 
-    def display(self, ctx):
-        for key, calculator in self.metrics.items():
-            if key in self.updated:
-                value = calculator.result()
-                if value is not None:
-                    self.history.append((ctx["step"], key, value))
-        self.updated = {}
-
+    def display(self, metrics, ctx):
+        for metric in metrics:
+            key, value = metric.get()
+            if value is not None:
+                if ctx["phase"] == "valid":
+                    key = "val_" + key
+                self.history.append((ctx["step"], key, value))
+ 
     def state_dict(self):
         return self.history
 
@@ -391,14 +393,12 @@ class TensorBoardMeter(BaseMeter):
         except BaseException:
             logging.warning("ignoring metric %s", name)
 
-    def display(self, ctx):
-        for key, calculator in self.metrics.items():
-            if key in self.updated:
-                value = calculator.result()
-                if value is not None:
-                    full_name = self.prefix + key
-                    self._write(full_name, value, ctx["step"])
-        self.updated = {}
+    def display(self, metrics, ctx):
+        for metric in metrics:
+            name, value = metric.get() 
+            if value is not None:
+                name = self.prefix + name
+                self._write(name, value, ctx["step"])
 
 
 class VisdomMeter(BaseMeter):

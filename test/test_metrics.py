@@ -11,15 +11,15 @@ from torchvision.models import resnet18
 def test_accuracy():
     metric = BinaryAccuracy()
     y = torch.randn(100,10,10)
-    result = metric(y, y>0.)
-    assert result == 1.
+    metric.update(y, y>0.)
+    name, value = metric.get()
+    assert value == 1.
     
-    result = metric(y, y<0.)
-    assert result == 0.
+    metric.reset()
+    metric.update(y, y<0.)
+    name, value = metric.get()
+    assert value == 0.
     
-    metric = BinaryAccuracy(threshold=0.5, sigmoid=True)
-    result = metric(y, y>0.)
-    assert result == 1.
     
 def test_tp():
     metric = ConfusionMetric(threshold=0.5, sigmoid=False)
@@ -43,5 +43,5 @@ def test_paramhistogram():
     loss = Mock()
     model = Supervisor(predictor, loss)
     metric = ParamHistogram(include_gradient=False, predictor_only=False)
-    metric(model, None)
+    metric.update(model, None)
     assert writer.add_histogram.is_called()

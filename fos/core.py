@@ -17,9 +17,11 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.jit import trace
 
+from fos.metrics import LossMetric
 
-class Supervisor(nn.Module):
+class Workout:
     '''Supervisor extends a regular PyTorch model with a loss function. This class extends from
        `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
        not typical, it is possible to have multiple trainers train the same model.
@@ -43,31 +45,43 @@ class Supervisor(nn.Module):
            model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
     '''
 
-    def __init__(self, predictor, loss_fn, metrics=None, mover=None):
+    def __init__(self, model, loss_fn,  optim=None, **metrics):
         super().__init__()
-        self.predictor = predictor
-        self.metrics = metrics if metrics is not None else {}
+        self.model = model
+        self.metrics = metrics
         self.loss_fn = loss_fn
-        self.step = 0
-        self.mover = mover if mover is not None else Mover.get_default(
-            predictor)
+        self.history = {}
+        self.loss_metric = LossMetric()
+        self.step  = 0
+        self.epoch = 0
+        self.optim = optim if optim is not None else torch.optim.SGD(model.params)
 
-    def handle_metrics(self, loss, input, target):
+        
+    def get_metricname(name, phase):
+        return name if phase == "train" else "valid_" + name
+        
+    def update_metrics(self, loss, pred, target, phase):
         '''Invoke the configured metrics functions and return the result
 
            Args:
                loss (scaler): the loss value
-               input (Tensor): the predicted value
+               pred (Tensor): the predicted value
                target (Tensor): the target value
         '''
-        output = {}
+        self.update_history(self.get_metricname("loss",phase), loss)
+        for name,fn in self.metrics:
+            value = fn(pred, target)
+            fqname = self.get_metricname(name,phase)
+            self.update_history(fqname, value)
 
-        output["loss"] = loss
-        for key, fn in self.metrics.items():
-            value = fn(input, target)
-            if value is not None:
-                output[key] = value
-        return output
+
+    def get_metrics(self):
+        '''Get all the configured metrics'''
+        return [self.loss_metric] + self.metrics
+            
+    def reset_metrics(self):
+        for metric in self.get_metrics():
+            metric.reset()
 
     def forward(self, input, target):
         '''Implementation of the forward method in nn.Module
@@ -76,10 +90,24 @@ class Supervisor(nn.Module):
                input (Tensor): the input data for the model
                target (Tensor): the target data for the loss function
         '''
-        pred = self.predictor(input)
+        pred = self.model(input)    
         loss = self.loss_fn(pred, target)
         return loss, pred
 
+    
+    def trace(self, input):
+        '''Create a traced model and return it. 
+
+           Args:
+               input (Tensor): a batch of input tensors
+        '''
+        self.train()
+        with torch.set_grad_enabled(False):
+            input = self.mover(input)
+            traced_model = trace(self.predictor, example_inputs=input, check_trace=False)
+            return traced_model
+
+    
     def predict(self, input):
         '''Predict a batch of data at once and return the result. No metrics
            will be generated when predicting values. The data will be moved to the
@@ -108,11 +136,11 @@ class Supervisor(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(input), self.mover(target)
             loss, pred = self(input, target)
-            return self.handle_metrics(loss.item(), pred, target)
+            return self.update_metrics(loss, pred, target)
 
-    def learn(self, input, target):
+    def step(self, input, target):
         '''Perform a single learning step. This method is normally invoked by
-           the trainer but can also be invoked directly. If there are metrics
+           the fit but can also be invoked directly. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value. The data will be moved to the
            device using the configured mover.
@@ -123,11 +151,14 @@ class Supervisor(nn.Module):
         '''
         self.train()
         with torch.set_grad_enabled(True):
-            self.step += 1
             input, target = self.mover(input), self.mover(target)
             loss, pred = self(input, target)
             loss.backward()
-            return self.handle_metrics(loss.item(), pred, target)
+            self.optim.step()
+            self.step += 1
+            self.update_metrics(loss, pred, target)
+            self.optim.zero_grad()
+
 
     def state_dict(self):
         return {
@@ -138,6 +169,35 @@ class Supervisor(nn.Module):
     def load_state_dict(self, state):
         self.step = state["step"]
         self.predictor.load_state_dict(state["predictor"])
+        
+        
+    def fit(self, data, valid_data=None, epochs=1):
+        '''Run the training and optionally the validation for a number of epochs.
+           If no validation data is provided, the validation cycle is skipped. If
+           the validaiton should not run every epoch, check the `Skipper` class.
+
+           Args:
+               data: the data to use for the training
+               valid_data: the data to use for the validation, default = None.
+               epochs (int): the number of epochs to run the training for, default = 1
+        '''
+        try:
+            for _ in range(epochs):
+                self.epoch += 1
+                for minibatch in data:
+                    self.step(self.mover(minibatch))
+                    cb(self, "train")
+                if valid_data is not None:
+                    for minibatch in valid_data:
+                        self.validate(self.mover(valid_data))
+                self.updatemetric("epoch")
+                cb(self, "valid")
+                
+        finally:
+            self.meter.reset()
+
+
+
 
 
 class Trainer():
@@ -164,14 +224,10 @@ class Trainer():
     def __init__(self, model, optim, meter, metrics=None):
         self.model = model
         self.optim = optim
-        self.metrics = metrics if metrics is not None else {}
+        self.metrics = metrics if metrics is not None else []
         self.epoch = 0
         self.id = str(int(time.time()))
         self.meter = meter
-
-    def _update_meter(self, output, prefix=""):
-        for key, value in output.items():
-            self.meter.update(prefix + key, value)
 
     def _display_meter(self, phase, progress=None):
         ctx = {
@@ -180,16 +236,16 @@ class Trainer():
             "phase": phase,
             "progress": progress
         }
-        self.meter.display(ctx)
+        metrics = self.model.get_metrics() + self.metrics
+        self.meter.display(metrics, ctx)
 
-    def _handle_metrics(self):
-        '''call the configured metrics and update the meters
+        
+    def update_metrics(self):
+        '''call the configured metrics and update them
            accordingly.
         '''
-        for key, fn in self.metrics.items():
-            value = fn(self.model, self.optim)
-            if value is not None:
-                self.meter.update(key, value)
+        for metric in self.metrics:
+            metric.update(self.model, self.optim)
 
     def _update_model(self):
         '''Update the model. At this point the model has performed both the
@@ -197,8 +253,7 @@ class Trainer():
         `optimizer.step()` to perform the updates and afterwards reset the
         gradients with `optimizer.zero_grad()`.
         '''
-        self.optim.step()
-        self.optim.zero_grad()
+     
 
     def train(self, data):
         '''Train the model using the training data provided. Typically you
@@ -209,10 +264,10 @@ class Trainer():
                data: the training data to use.
         '''
         steps_per_epoch = len(data)
+        self.model.reset_metrics()
         for idx, (input, target) in enumerate(data):
-            output = self.model.learn(input, target)
-            self._update_meter(output)
-            self._handle_metrics()
+            self.model.learn(input, target)
+            self.update_metrics()
             self._update_model()
             progress = (1. + idx) / steps_per_epoch
             self._display_meter("train", progress)
@@ -225,9 +280,9 @@ class Trainer():
            Args:
                data: the validation data to use.
         '''
+        self.model.reset_metrics()
         for input, target in data:
-            output = self.model.validate(input, target)
-            self._update_meter(output, "val_")
+            self.model.validate(input, target)
         self._display_meter("valid")
 
         
@@ -302,12 +357,14 @@ class Trainer():
             "optim": self.optim.state_dict()
         }
 
+
     def load_state_dict(self, state):
         self.epoch = state["epoch"]
         self.id = state["id"]
         self.model.load_state_dict(state["model"])
         self.meter.load_state_dict(state["meter"])
         self.optim.load_state_dict(state["optim"])
+
 
     def save(self, filename=None):
         '''Save the training state to a file. This includes the underlying model state
@@ -335,6 +392,7 @@ class Trainer():
             filename = "{}trainer_{:08d}.pty".format(subdir, self.model.step)
         torch.save(self.state_dict(), filename)
         return filename
+
 
     def load(self, filename=None):
         '''Restore previously stored training program.
@@ -412,7 +470,7 @@ class Mover():
 
         if isinstance(batch, (list, tuple)):
             batch = [self(row) for row in batch]
-            return batch
+            return tuple(batch)
 
         if isinstance(batch, np.ndarray):
             batch = torch.from_numpy(batch)

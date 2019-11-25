@@ -31,7 +31,7 @@ def test_supervisor_basic():
     assert model.step == 0
 
     y = model.validate(*data)
-    assert y is not None
+    assert y is None
     assert model.step == 0
 
     y = model.predict(data[0])
@@ -44,20 +44,29 @@ def my_metric(y, t):
     return 1.
 
 
+class SmartMetric():
+    def reset(self):
+        pass
+    
+    def update(self, *args):
+        pass
+    
+    def get(self):
+        return "mymetric", 1.
+
+
 def test_supervisor_metrics():
 
     metric_name = "test"
 
     predictor = get_predictor()
     loss = F.mse_loss
-    model = Supervisor(predictor, loss, metrics={metric_name: my_metric})
+    model = Supervisor(predictor, loss, metrics=[SmartMetric()])
     assert model.step == 0
 
     data = get_data(1)[0]
-    output = model.validate(*data)
-    assert metric_name in output
-    assert "loss" in output
-    assert output[metric_name] == 1.
+    model.validate(*data)
+    assert len(model.get_metrics()) == 2
 
 
 def test_supervisor_train():
@@ -66,14 +75,12 @@ def test_supervisor_train():
     predictor = get_predictor()
     loss = F.mse_loss
     optim = torch.optim.Adam(predictor.parameters())
-    model = Supervisor(predictor, loss, metrics={metric_name: my_metric})
+    model = Supervisor(predictor, loss, metrics=[SmartMetric()])
 
     assert model.step == 0
 
     x, t = get_data(1)[0]
-    output = model.learn(x, t)
-    assert "loss" in output
-    assert metric_name in output
+    model.learn(x, t)
     assert model.step == 1
 
     output2 = model.learn(x, t)
