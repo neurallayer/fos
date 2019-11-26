@@ -2,17 +2,16 @@ import logging
 from abc import abstractmethod
 from collections import OrderedDict
 from tqdm import tqdm
-from ..core import Workout
 from ..calc import AvgCalc
 
 
-def _get_metrics2process(workout: Workout, metrics: [str]):
+def _get_metrics2process(workout, metrics: [str]):
     [m for m in metrics if workout.has_metric(m)]
 
 
-class Meter():
+class WorkoutCallback():
     '''This is the interface that needs to be implemented
-       by any meter.
+       for classes that want to function as a callback.
 
        The iteraction is as follows:
 
@@ -31,23 +30,44 @@ class Meter():
     '''
 
     @abstractmethod
-    def __call__(self, workout: Workout, phase: str):
+    def __call__(self, workout, phase: str):
         '''update the state of the meter with a certain metric and its value.
 
            Args:
-               workout (str): the workout
-               phase: the phase (trianing or validation)
+               workout: the workout
+               phase: the phase ("trian" or "valid")
         '''
 
 
-class SilentMeter(Meter):
+class EarlyStop(WorkoutCallback):
+
+    def __init__(self, metric="val_loss", minimize=True):
+        self.metric = metric
+        self.minimize = minimize
+        self.value = float('Inf') if minimize else -float('Inf')
+
+    def __call__(self, workout, phase: str):
+        if phase == "train":
+            return
+
+        value = workout.get_metric(self.metric)
+
+        if self.minimize & value < self.value:
+            self.value = value
+        elif not self.minimize & value > self.value:
+            self.value = value
+        else:
+            workout.stop()
+
+
+class SilentMeter(WorkoutCallback):
     '''Silently ignore all the metrics and don't produce any output'''
 
     def __call__(self, workout, phase):
         pass
 
 
-class PrintMeter(Meter):
+class PrintMeter(WorkoutCallback):
     '''Displays the metrics by using a simple print
        statement the end of an epoch
 
@@ -73,7 +93,7 @@ class PrintMeter(Meter):
             result = " - {} : {} ".format(key, value)
         return result
 
-    def __call__(self, workout: Workout, phase: str):
+    def __call__(self, workout, phase: str):
         if phase != "valid":
             return
         result = "{:6}:{:6}".format(workout.epoch, workout.step)
@@ -85,7 +105,7 @@ class PrintMeter(Meter):
         print(result)
 
 
-class MultiMeter(Meter):
+class MultiMeter(WorkoutCallback):
     '''Container of other meters, allowing for more than one meter
        be used during training.
 
@@ -130,7 +150,7 @@ class MultiMeter(Meter):
                 meter.load_state_dict(meter_state)
 
 
-class BaseMeter(Meter):
+class BaseMeter(WorkoutCallback):
     '''Base meter that provides a default implementation for the various methods except
        the display method. So a subclas has to implement the display method.
 
@@ -191,21 +211,22 @@ class BaseMeter(Meter):
         self.updated = {}
 
 
-class NotebookMeter(Meter):
+class NotebookMeter(WorkoutCallback):
     '''Meter that displays the metrics and progress in
        a Jupyter notebook. This meter uses tqdm to display
        the progress bar.
     '''
 
-    def __init__(self):
+    def __init__(self, metrics=["loss", "val_loss"]):
         self.tqdm = None
-        self.reset()
+        self.epoch = -1
+        self.metrics = metrics
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
 
-    def _get_tqdm(self):
+    def _get_tqdm(self, workout):
         if self.tqdm is None:
             self.tqdm = tqdm(
-                total=100,
+                total=workout.batches+1,
                 mininterval=1,
                 bar_format=self.bar_format)
         return self.tqdm
@@ -218,46 +239,31 @@ class NotebookMeter(Meter):
             result = "{}={} ".format(key, value)
         return result
 
-    def reset(self):
-        self.state = OrderedDict()
-        self.last = 0
+    def new_meter(self, workout):
+        # self.last = workout.step - 1
+        self.epoch = workout.epoch
         if self.tqdm is not None:
             self.tqdm.close()
             self.tqdm = None
 
-    def _process_metrics(self, metrics, phase):
-        for metric in metrics:
-            key, value = metric.get()
-            if value is not None:
-                if phase == "valid":
-                    key = "val_" + key
-                self.state[key] = value
+    def __call__(self, workout, phase):
+        if workout.epoch > self.epoch:
+            self.new_meter(workout)
 
-    def display(self, metrics, ctx):
-        progress = ctx["progress"]
+        # progress = (workout.step - self.last)/workout.batches
 
-        if progress is not None:
-            rel_progress = int(progress * 100) - self.last
-            # Avoid updating too often.
-            if (progress != 1.0) and (rel_progress == 0):
-                return
+        result = "[{:3}:{:6}] ".format(workout.epoch, workout.step)
+        for metric in self.metrics:
+            if workout.has_metric(metric):
+                result += self.format(metric, workout.get_metric(metric))
 
-        self._process_metrics(metrics, ctx["phase"])
-
-        result = "[{:3}:{:6}] ".format(ctx["epoch"], ctx["step"])
-        for key, value in self.state.items():
-            result += self.format(key, value)
-
-        pb = self._get_tqdm()
-        if progress is not None:
-            pb.update(rel_progress)
-            self.last = int(progress * 100)
-            pb.set_description(result, refresh=False)
-        else:
-            pb.set_description(result)
+        pb = self._get_tqdm(workout)
+        pb.update(1)
+        # pb.set_description(result, refresh=False)
+        pb.set_description(result)
 
 
-class TensorBoardMeter(Meter):
+class TensorBoardMeter(WorkoutCallback):
     '''Log the metrics to a tensorboard file so they can be reviewed
        in tensorboard. Currently supports the following type for metrics:
 

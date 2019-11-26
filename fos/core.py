@@ -17,6 +17,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+from .meters import PrintMeter
 from torch.jit import trace
 from enum import Enum
 from typing import Callable
@@ -25,20 +26,25 @@ from typing import Callable
 class Phase(Enum):
     TRAIN = 1
     VALID = 2
+    OTHER = 3
 
 
 class StopError(Exception):
+    '''used internally to stop the training before all the epochs have finished'''
     pass
 
 
-class SmartReducer(dict):
+class SmartHistory(dict):
     '''Stores the values of a metric. In essence it is a dictionary with the
-    key being the step when the metric was recorded and the value being the
-    metric value itself.
+    key being the step when the metric was calculated and the value being the
+    outcome of that calculation.
 
     If multiple values per step are received (like is the case with validation)
     the moving average of the metric values are stored instead.
-    The default momentum for the moving average is 0.9.
+
+    Args:
+        momentum: The momentum to use for the moving average (default = 0.9). The
+        calculation used is: momentum*old + (1-momentum)*new
     '''
 
     def __init__(self, momentum=0.9):
@@ -56,28 +62,31 @@ def empty_cb(*args):
 
 
 class Workout(nn.Module):
-    '''Supervisor extends a regular PyTorch model with a loss function. This class extends from
-       `nn.Module` but adds methods that the trainer will use to train and validate the model. Altough
-       not typical, it is possible to have multiple trainers train the same model.
+    '''Coordinates all the training of a model Workout and provides many methods that
+       reduces the amount of boilerplate code when training a model. In its the simplest form:
 
-       Besides the added loss function, also additional metrics can be specified to get insights into
-       the performance of model. Normally you won't call a supervisor directly but rather interact with
-       an instance of the Trainer_ class.
+       .. code-block:: python
+
+           workout = Workout(mymodel, F.mse_loss)
+           workout.fit(data, epochs=10)
+
+       Besides the added loss function and optional optimizer, also additional metrics can be specified
+       to get insights into the performance of model.
 
        Args:
            model (nn.Module): The model that needs to be trained.
            loss_fn (function): The loss function (objective) that should be used to train the model
            optim: The optimizer to use. If none is provided, SGD will be used
-           metrics : The metrics that should be evaluated during the training and validation
            mover: the mover to use. If None is specified, a default mover will be created to move
-           tensors to the correct device
-
+           tensors to the correct device.
+           metrics : The metrics that should be evaluated during the training and validation. Every metric
+           can be specified as an optional argument, e.g acc=BinaryAccuracy()
 
        Example usage:
 
        .. code-block:: python
 
-           model = Supervisor(preditor, F.mse_loss, {"acc": BinaryAccuracy()})
+           workout = Workout(model, F.mse_loss, Adam(model.paramters()), acc=BinaryAccuracy())
     '''
 
     def __init__(self, model: nn.Module, loss_fn: Callable, optim=None, mover=None, **metrics):
@@ -89,14 +98,17 @@ class Workout(nn.Module):
         self.history = {}
         self.step = 0
         self.epoch = 0
+        self.batches = None
         self.id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(
                                                 model.parameters(), lr=1e-3)
 
     def update_history(self, name: str, value):
-        ''''Update the history for the passed metric name and value'''
+        ''''Update the history for the passed metric name and value. It will store
+            store the metric under the current step.
+        '''
         if name not in self.history:
-            self.history[name] = SmartReducer()
+            self.history[name] = SmartHistory()
         self.history[name][self.step] = value
 
     def get_metricname(self, name: str, phase: str):
@@ -162,7 +174,7 @@ class Workout(nn.Module):
         '''Create a traced model and return it.
 
            Args:
-               input (Tensor): a batch of input tensors
+               input (Tensor): a minibatch of input tensors
         '''
         self.model.train()
         with torch.set_grad_enabled(False):
@@ -177,7 +189,7 @@ class Workout(nn.Module):
            the device using the configured mover.
 
            Args:
-               input (Tensor): the minibatch of input tensors
+               input (Tensor): the minibatch of only input tensors
         '''
         self.model.eval()
         with torch.set_grad_enabled(False):
@@ -194,7 +206,7 @@ class Workout(nn.Module):
            Args:
                minibatch: the input and target tensor as a tuple
         '''
-        self.eval()
+        self.model.eval()
         with torch.set_grad_enabled(False):
             input, target = self.mover(minibatch)
             loss, pred = self(input, target)
@@ -208,7 +220,7 @@ class Workout(nn.Module):
            device using the configured mover.
 
            Args:
-               minibatch: the input and target tensor as a tuple
+               minibatch: the input and target tensors as a tuple
         '''
         self.model.train()
         with torch.set_grad_enabled(True):
@@ -243,10 +255,10 @@ class Workout(nn.Module):
         self.model.load_state_dict(state["model"])
         self.optim.load_state_dict(state["optim"])
 
-    def fit(self, data, valid_data=None, epochs=1, cb=empty_cb):
+    def fit(self, data, valid_data=None, epochs=1, cb=PrintMeter()):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
-           If the validaiton should not run every epoch, check the `Skipper`
+           If the validation should not run every epoch, check the `Skipper`
            class.
 
            Args:
@@ -254,20 +266,28 @@ class Workout(nn.Module):
                valid_data: the data to use for the validation, default = None.
                epochs (int): the number of epochs to run the training for,
                default = 1
+               cb: the callback to use. These are invoked at the end of an update
+               and the end of the validation. The default is the PrintMeter that will
+               print an update at the end of each epoch.
         '''
+        try:
 
-        for _ in range(epochs):
-            self.epoch += 1
-            for minibatch in data:
-                self.update(minibatch)
-                cb(self, "train")
-            if valid_data is not None:
-                for minibatch in valid_data:
-                    self.validate(minibatch)
-            self.update_history("epoch", self.epoch)
-            cb(self, "valid")
+            self.batches = len(data)
 
-    def save(self, filename=None):
+            for _ in range(epochs):
+                self.epoch += 1
+                for minibatch in data:
+                    self.update(minibatch)
+                    cb(self, "train")
+                if valid_data is not None:
+                    for minibatch in valid_data:
+                        self.validate(minibatch)
+                self.update_history("epoch", self.epoch)
+                cb(self, "valid")
+        except StopError:
+            pass
+
+    def save(self, filename: str = None):
         '''Save the training state to a file. This includes the underlying model state
            but also the optimizer state and internal state. This makes it
            possible to continue training where it was left off.
@@ -294,14 +314,14 @@ class Workout(nn.Module):
         torch.save(self.state_dict(), filename)
         return filename
 
-    def load(self, filename=None):
-        '''Restore previously stored training program.
+    def load(self, filename: str = None):
+        '''Restore previously stored workout.
 
            If no filename is provided it will try to find the last stored training
            file and will use that one. The algoritm assumed that directories
            and files can be sorted based on its name to find the latest version. This is
            true is you use the let Fos determine the filename, but might not be the case
-           if you provided your own filename during the `trainer.save` method.
+           if you provided your own filename during the `save` method.
 
            Args:
                filename (str): The filename of the training state to load.
@@ -333,7 +353,7 @@ def _find_latest_training(rootdir: str):
 
 class Mover():
     '''Moves tensors to a specific device. This is used to move
-       the input and target tensors to the correct device. Normally
+       the input and target tensors to the correct device like a GPU. Normally
        the default mover will be fine and you don't have to specify one
        explictely when you create the Workout.
 
@@ -356,14 +376,14 @@ class Mover():
     @staticmethod
     def get_default(model: nn.Module):
         '''Get a mover based on the device on which the parameters of
-           the model resides. This method is also called by the trainer if
-           there is no mover provided as an argument when creating a new trainer
+           the model resides. This method is also called by the workout if
+           there is no mover provided as an argument when creating a new workout
         '''
         device = next(model.parameters()).device
         return Mover(device)
 
     def __call__(self, batch):
-        '''Move a single batch to the correct device'''
+        '''Move a minibatch to the correct device'''
 
         if torch.is_tensor(batch):
             return batch.to(device=self.device, non_blocking=self.non_blocking)

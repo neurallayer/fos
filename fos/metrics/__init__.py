@@ -42,20 +42,19 @@ class BinaryAccuracy(Metric):
 
         return (input == target).float().mean()
 
-    
+
 def _get_metrics(workout, metric):
-    l = list(workout.history[metric].keys())
-    l.sort()
-    return l, [workout.history[metric][k] for k in l]
+    keys = list(workout.history[metric].keys())
+    keys.sort()
+    return keys, [workout.history[metric][k] for k in keys]
 
 
 def plot_metrics(plt, workout, metrics):
     for metric in metrics:
         X, Y = _get_metrics(workout, metric)
-        plt.plot(X, Y) 
+        plt.plot(X, Y)
 
     plt.xlabel("steps")
     plt.ylabel("values")
     plt.legend(metrics)
     return plt.show()
-
