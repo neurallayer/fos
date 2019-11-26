@@ -268,7 +268,7 @@ class Workout(nn.Module):
                default = 1
                cb: the callback to use. These are invoked at the end of an update
                and the end of the validation. The default is the PrintMeter that will
-               print an update at the end of each epoch.
+               print an update at the end of each epoch and ignore the other updates.
         '''
         try:
 
@@ -276,12 +276,15 @@ class Workout(nn.Module):
 
             for _ in range(epochs):
                 self.epoch += 1
+
                 for minibatch in data:
                     self.update(minibatch)
                     cb(self, "train")
+
                 if valid_data is not None:
                     for minibatch in valid_data:
                         self.validate(minibatch)
+
                 self.update_history("epoch", self.epoch)
                 cb(self, "valid")
         except StopError:

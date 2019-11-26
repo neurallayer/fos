@@ -25,17 +25,18 @@ def test_trainer():
 
     data = get_data(100)
     workout.fit(data)
-    assert trainer.epoch == 1
+    assert workout.epoch == 1
 
     workout.fit(data, epochs=10)
-    assert trainer.epoch == 11
+    assert workout.epoch == 11
 
     valid_data = get_data(100)
-    workout.validate(valid_data)
-    assert trainer.epoch == 11
+    for minibatch in valid_data:
+        workout.validate(minibatch)
+    assert workout.epoch == 11
 
     workout.fit(data, valid_data, epochs=5)
-    assert trainer.epoch == 16
+    assert workout.epoch == 16
 
 
 def test_trainer_predict():
