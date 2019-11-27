@@ -40,6 +40,9 @@ class WorkoutCallback():
 
 
 class EarlyStop(WorkoutCallback):
+    '''Automatically stop the training if a certain metric doesn't improve anymore.
+       This is checked at the end of every epoch.
+    '''
 
     def __init__(self, metric="val_loss", minimize=True):
         self.metric = metric
@@ -58,6 +61,47 @@ class EarlyStop(WorkoutCallback):
             self.value = value
         else:
             workout.stop()
+
+
+class AutoSave(WorkoutCallback):
+    '''Automatically save the model as long as a certain metric improves. This
+       is run at the end of every epoch.
+    '''
+
+    def __init__(self, metric="val_loss", minimize=True, filename=None):
+        self.metric = metric
+        self.minimize = minimize
+        self.value = float('Inf') if minimize else -float('Inf')
+        self.filename = filename
+
+    def __call__(self, workout, phase: str):
+        if phase == "train":
+            return
+
+        value = workout.get_metric(self.metric)
+
+        if self.minimize & value < self.value:
+            self.value = value
+            workout.save(self.filename)
+        elif not self.minimize & value > self.value:
+            self.value = value
+            workout.save(self.filename)
+        else:
+            workout.stop()
+
+
+class EpochSave(WorkoutCallback):
+    '''Save the model at the end of every epoch.
+    '''
+
+    def __init__(self, filename=None):
+        self.filename = filename
+
+    def __call__(self, workout, phase: str):
+        if phase == "train":
+            return
+        else:
+            workout.save(self.filename)
 
 
 class SilentMeter(WorkoutCallback):
@@ -289,7 +333,7 @@ class TensorBoardMeter(WorkoutCallback):
        .. code-block:: python
 
           writer = HistoryWriter("/tmp/runs/myrun")
-          metrics = {"loss":AvgCalc(), "val_loss":AvgCalc()}
+          metrics = ["loss", "acc", "val_acc"]
           meter = TensorBoardMeter(writer, metrics=metrics, prefix="metrics/")
           ...
     '''
@@ -327,7 +371,8 @@ class TensorBoardMeter(WorkoutCallback):
 
     def __call__(self, workout, phase):
         for metric in self.metrics:
-            value = workout.get_metric(metric)
-            if value is not None:
-                name = self.prefix + metric
-                self._write(name, value, workout.step)
+            if workout.has_metric(metric):
+                value = workout.get_metric(metric)
+                if value is not None:
+                    name = self.prefix + metric
+                    self._write(name, value, workout.step)

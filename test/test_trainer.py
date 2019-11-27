@@ -100,3 +100,5 @@ def test_trainer_metrics():
     data = get_data(100)
     trainer.run(data, data)
     assert trainer.epoch == 1
+
+test_trainer()

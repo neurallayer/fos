@@ -247,6 +247,10 @@ class Workout(nn.Module):
             "optim": self.optim.state_dict()
         }
 
+    def invoke_callbacks(self, callbacks, phase):
+        for cb in callbacks:
+            cb(self, phase)
+
     def load_state_dict(self, state: dict):
         self.id = state["id"]
         self.step = state["step"]
@@ -270,6 +274,8 @@ class Workout(nn.Module):
                and the end of the validation. The default is the PrintMeter that will
                print an update at the end of each epoch and ignore the other updates.
         '''
+        cb = cb if isinstance(cb, (list, tuple)) else [cb]
+
         try:
 
             self.batches = len(data)
@@ -279,14 +285,15 @@ class Workout(nn.Module):
 
                 for minibatch in data:
                     self.update(minibatch)
-                    cb(self, "train")
+                    self.invoke_callbacks(cb, "train")
 
                 if valid_data is not None:
                     for minibatch in valid_data:
                         self.validate(minibatch)
 
                 self.update_history("epoch", self.epoch)
-                cb(self, "valid")
+                self.invoke_callbacks(cb, "train")
+
         except StopError:
             pass
 
