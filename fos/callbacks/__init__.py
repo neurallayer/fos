@@ -1,3 +1,5 @@
+'''Contains various callbacks that can be used during training to add a wide variaty of functionality'''
+
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
@@ -6,7 +8,7 @@ from ..calc import AvgCalc
 
 
 def _get_metrics2process(workout, metrics: [str]):
-    [m for m in metrics if workout.has_metric(m)]
+    return [m for m in metrics if workout.has_metric(m)]
 
 
 class WorkoutCallback():
@@ -149,49 +151,6 @@ class PrintMeter(WorkoutCallback):
         print(result)
 
 
-class MultiMeter(WorkoutCallback):
-    '''Container of other meters, allowing for more than one meter
-       be used during training.
-
-       Arguments:
-           meters: the meters that should be wrapped
-
-       Example usage:
-
-       .. code-block:: python
-
-           meter1 = NotebookMeter()
-           meter2 = TensorBoardMeter()
-           meter = MultiMeter(meter1, meter2)
-           trainer = Trainer(model, optim, meter)
-    '''
-
-    def __init__(self, *meters):
-        self.meters = list(meters)
-
-    def add(self, meter):
-        '''Add a meter to this multimeter'''
-        self.meters.append(meter)
-
-    def reset(self):
-        for meter in self.meters:
-            meter.reset()
-
-    def display(self, metrics, ctx):
-        for meter in self.meters:
-            meter.display(metrics, ctx)
-
-    def state_dict(self):
-        return [meter.state_dict() for meter in self.meters]
-
-    def load_state_dict(self, state):
-        if len(state) != len(self.meters):
-            logging.warning(
-                "Invalid state receive for MultiMeter, will reset only.")
-            self.reset()
-        else:
-            for meter_state, meter in zip(state, self.meters):
-                meter.load_state_dict(meter_state)
 
 
 class BaseMeter(WorkoutCallback):
@@ -230,29 +189,12 @@ class BaseMeter(WorkoutCallback):
         self.dynamic = True if metrics is None else False
         self.updated = {}
 
-    def _get_calc(self, key):
-        if key in self.metrics:
-            return self.metrics[key]
 
-        if key in self.exclude:
-            return None
+    def __call__(self, workout, phase):
+        if self.metrics is None:
+            metrics = workout.get_metrics()
+            metrics = metrics.filter(self.exclude)
 
-        if self.dynamic:
-            self.metrics[key] = AvgCalc()
-            return self.metrics[key]
-
-        return None
-
-    def update(self, key, value):
-        calc = self._get_calc(key)
-        if calc is not None:
-            calc.add(value)
-            self.updated[key] = True
-
-    def reset(self):
-        for calculator in self.metrics.values():
-            calculator.clear()
-        self.updated = {}
 
 
 class NotebookMeter(WorkoutCallback):
@@ -275,7 +217,7 @@ class NotebookMeter(WorkoutCallback):
                 bar_format=self.bar_format)
         return self.tqdm
 
-    def format(self, key, value):
+    def _format(self, key, value):
         try:
             value = float(value)
             result = "{}={:.5f} ".format(key, value)
@@ -283,7 +225,7 @@ class NotebookMeter(WorkoutCallback):
             result = "{}={} ".format(key, value)
         return result
 
-    def new_meter(self, workout):
+    def _new_meter(self, workout):
         # self.last = workout.step - 1
         self.epoch = workout.epoch
         if self.tqdm is not None:
@@ -292,14 +234,14 @@ class NotebookMeter(WorkoutCallback):
 
     def __call__(self, workout, phase):
         if workout.epoch > self.epoch:
-            self.new_meter(workout)
+            self._new_meter(workout)
 
         # progress = (workout.step - self.last)/workout.batches
 
         result = "[{:3}:{:6}] ".format(workout.epoch, workout.step)
         for metric in self.metrics:
             if workout.has_metric(metric):
-                result += self.format(metric, workout.get_metric(metric))
+                result += self._format(metric, workout.get_metric(metric))
 
         pb = self._get_tqdm(workout)
         pb.update(1)

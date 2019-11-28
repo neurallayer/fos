@@ -14,16 +14,17 @@ There are 3 classes in the core package:
 import time
 import os
 import logging
+from enum import Enum
+from typing import Callable
 import numpy as np
 import torch
 import torch.nn as nn
-from .meters import PrintMeter
 from torch.jit import trace
-from enum import Enum
-from typing import Callable
+from .meters import PrintMeter
 
 
 class Phase(Enum):
+    '''Identifies the stage the training is in'''
     TRAIN = 1
     VALID = 2
     OTHER = 3
@@ -31,7 +32,6 @@ class Phase(Enum):
 
 class StopError(Exception):
     '''used internally to stop the training before all the epochs have finished'''
-    pass
 
 
 class SmartHistory(dict):
@@ -57,10 +57,6 @@ class SmartHistory(dict):
         super().__setitem__(step, value)
 
 
-def empty_cb(*args):
-    pass
-
-
 class Workout(nn.Module):
     '''Coordinates all the training of a model Workout and provides many methods that
        reduces the amount of boilerplate code when training a model. In its the simplest form:
@@ -70,8 +66,8 @@ class Workout(nn.Module):
            workout = Workout(mymodel, F.mse_loss)
            workout.fit(data, epochs=10)
 
-       Besides the added loss function and optional optimizer, also additional metrics can be specified
-       to get insights into the performance of model.
+       Besides the added loss function and optional optimizer, also additional metrics can be
+       specified to get insights into the performance of model.
 
        Args:
            model (nn.Module): The model that needs to be trained.
@@ -79,8 +75,8 @@ class Workout(nn.Module):
            optim: The optimizer to use. If none is provided, SGD will be used
            mover: the mover to use. If None is specified, a default mover will be created to move
            tensors to the correct device.
-           metrics : The metrics that should be evaluated during the training and validation. Every metric
-           can be specified as an optional argument, e.g acc=BinaryAccuracy()
+           metrics : The metrics that should be evaluated during the training and validation.
+           Every metric can be specified as an optional argument, e.g acc=BinaryAccuracy()
 
        Example usage:
 
@@ -101,7 +97,7 @@ class Workout(nn.Module):
         self.batches = None
         self.id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(
-                                                model.parameters(), lr=1e-3)
+            model.parameters(), lr=1e-3)
 
     def update_history(self, name: str, value):
         ''''Update the history for the passed metric name and value. It will store
@@ -134,8 +130,8 @@ class Workout(nn.Module):
         '''
         loss_name = self.get_metricname("loss", phase)
         self.update_history(loss_name, loss.item())
-        for name, fn in self.metrics.items():
-            value = fn(pred, target)
+        for name, func in self.metrics.items():
+            value = func(pred, target)
             fqname = self.get_metricname(name, phase)
             self.update_history(fqname, value)
 
@@ -247,9 +243,9 @@ class Workout(nn.Module):
             "optim": self.optim.state_dict()
         }
 
-    def invoke_callbacks(self, callbacks, phase):
-        for cb in callbacks:
-            cb(self, phase)
+    def _invoke_callbacks(self, callbacks, phase):
+        for callback in callbacks:
+            callback(self, phase)
 
     def load_state_dict(self, state: dict):
         self.id = state["id"]
@@ -259,7 +255,7 @@ class Workout(nn.Module):
         self.model.load_state_dict(state["model"])
         self.optim.load_state_dict(state["optim"])
 
-    def fit(self, data, valid_data=None, epochs=1, cb=PrintMeter()):
+    def fit(self, data, valid_data=None, epochs=1, callbacks=PrintMeter()):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -270,11 +266,12 @@ class Workout(nn.Module):
                valid_data: the data to use for the validation, default = None.
                epochs (int): the number of epochs to run the training for,
                default = 1
-               cb: the callback to use. These are invoked at the end of an update
+               callbacks: the callbacks to use. These are invoked at the end of an update
                and the end of the validation. The default is the PrintMeter that will
-               print an update at the end of each epoch and ignore the other updates.
+               print an update at the end of each epoch and ignore the other updates. This can
+               be a single callback or a list of callbacks.
         '''
-        cb = cb if isinstance(cb, (list, tuple)) else [cb]
+        callbacks = callbacks if isinstance(callbacks, (list, tuple)) else [callbacks]
 
         try:
 
@@ -285,14 +282,14 @@ class Workout(nn.Module):
 
                 for minibatch in data:
                     self.update(minibatch)
-                    self.invoke_callbacks(cb, "train")
+                    self._invoke_callbacks(callbacks, "train")
 
                 if valid_data is not None:
                     for minibatch in valid_data:
                         self.validate(minibatch)
 
                 self.update_history("epoch", self.epoch)
-                self.invoke_callbacks(cb, "train")
+                self._invoke_callbacks(callbacks, "train")
 
         except StopError:
             pass

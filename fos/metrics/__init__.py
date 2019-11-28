@@ -1,3 +1,7 @@
+'''
+This module contains the various metrics that can used to monitor the progress during training.
+'''
+
 from abc import abstractmethod
 
 
@@ -43,6 +47,22 @@ class BinaryAccuracy(Metric):
         return (input == target).float().mean()
 
 
+class SingleClassAccuracy(Metric):
+    '''Accuracy for single class predictions like MNIST.
+       Label is expected in the shape [Batch] and predictions [N x Batch]
+    '''
+    def __init__(self, activation=None):
+        self.activation = activation
+
+    def __call__(self, yp, y):
+        if self.activation is not None:
+            yp = self.activation(yp)
+
+        (_, arg_maxs) = yp.max(dim=1)
+        result = (y == arg_maxs).float().mean()
+        return result.item()
+
+
 def _get_metrics(workout, metric):
     keys = list(workout.history[metric].keys())
     keys.sort()
@@ -50,9 +70,10 @@ def _get_metrics(workout, metric):
 
 
 def plot_metrics(plt, workout, metrics):
+    '''Plot metrics collected during training'''
     for metric in metrics:
-        X, Y = _get_metrics(workout, metric)
-        plt.plot(X, Y)
+        x_data, y_data = _get_metrics(workout, metric)
+        plt.plot(x_data, y_data)
 
     plt.xlabel("steps")
     plt.ylabel("values")
