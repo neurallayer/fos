@@ -1,9 +1,10 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fos import Workout
-from fos.meters import SilentMeter
-import os
+from fos.callbacks import SilentMeter
+
 
 
 def get_model():
@@ -47,7 +48,7 @@ def test_trainer_predict():
     workout = Workout(model, loss, optim)
 
     data = get_data(100)
-    result = workout.predict(data, ignore_label=True)
+    result = workout.predict(data)
     assert len(result) == 100*16
 
 
@@ -61,15 +62,15 @@ def test_trainer_state():
     workout.load_state_dict(state)
 
     filename = "./tmp_file.dat"
-    result = trainer.save(filename)
+    result = workout.save(filename)
     assert result == filename
 
-    result = trainer.load(filename)
+    result = workout.load(filename)
     assert result == filename
     os.remove(filename)
 
-    filename1 = trainer.save()
-    filename2 = trainer.load()
+    filename1 = workout.save()
+    filename2 = workout.load()
     os.remove(filename1)
     assert filename1 == filename2
     dir1 = os.path.dirname(filename1)
@@ -93,12 +94,10 @@ def test_trainer_metrics():
     model = get_model()
     loss = F.mse_loss
     optim = torch.optim.Adam(model.parameters())
-    model = Workout(model, loss)
-    meter = MemoryMeter()
-    trainer = Trainer(model, optim, meter, metrics=[SmartMetric()])
+    workout = Workout(model, loss, optim)
 
     data = get_data(100)
-    trainer.run(data, data)
-    assert trainer.epoch == 1
+    workout.fit(data, data)
+    assert workout.epoch == 1
 
 test_trainer()
