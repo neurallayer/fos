@@ -20,7 +20,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.jit import trace
-from .meters import PrintMeter
+from .callbacks import PrintMeter
 
 
 class Phase(Enum):

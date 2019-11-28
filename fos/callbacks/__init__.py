@@ -1,4 +1,6 @@
-'''Contains various callbacks that can be used during training to add a wide variaty of functionality'''
+'''Contains various callbacks that can be used during training to add a wide variety
+of functionality
+'''
 
 import logging
 from abc import abstractmethod
@@ -11,7 +13,7 @@ def _get_metrics2process(workout, metrics: [str]):
     return [m for m in metrics if workout.has_metric(m)]
 
 
-class WorkoutCallback():
+class Callback():
     '''This is the interface that needs to be implemented
        for classes that want to function as a callback.
 
@@ -41,7 +43,7 @@ class WorkoutCallback():
         '''
 
 
-class EarlyStop(WorkoutCallback):
+class EarlyStop(Callback):
     '''Automatically stop the training if a certain metric doesn't improve anymore.
        This is checked at the end of every epoch.
     '''
@@ -65,7 +67,7 @@ class EarlyStop(WorkoutCallback):
             workout.stop()
 
 
-class AutoSave(WorkoutCallback):
+class AutoSave(Callback):
     '''Automatically save the model as long as a certain metric improves. This
        is run at the end of every epoch.
     '''
@@ -92,7 +94,26 @@ class AutoSave(WorkoutCallback):
             workout.stop()
 
 
-class EpochSave(WorkoutCallback):
+class RegisterLR(Callback):
+    '''Get the learning rates used by the optimizer. Comes in handy
+       if you use for example a scheduler and want to track how it
+       changed the learning rate during the training. This will add the
+       learning rates to the history of the workout.
+
+       This callback supports optimizers with multiple parameter groups
+    '''
+
+    def __init__(self, prefix="lr_"):
+        self.prefix = prefix
+
+    def __call__(self, workout, phase: str):
+        for idx, group in enumerate(workout.optim.param_groups):
+            name = self.prefix + idx
+            value = group["lr"]
+            workout.update_history(name, value)
+
+
+class EpochSave(Callback):
     '''Save the model at the end of every epoch.
     '''
 
@@ -102,18 +123,17 @@ class EpochSave(WorkoutCallback):
     def __call__(self, workout, phase: str):
         if phase == "train":
             return
-        else:
-            workout.save(self.filename)
+        workout.save(self.filename)
 
 
-class SilentMeter(WorkoutCallback):
+class SilentMeter(Callback):
     '''Silently ignore all the metrics and don't produce any output'''
 
     def __call__(self, workout, phase):
         pass
 
 
-class PrintMeter(WorkoutCallback):
+class PrintMeter(Callback):
     '''Displays the metrics by using a simple print
        statement the end of an epoch
 
@@ -153,7 +173,7 @@ class PrintMeter(WorkoutCallback):
 
 
 
-class BaseMeter(WorkoutCallback):
+class BaseMeter(Callback):
     '''Base meter that provides a default implementation for the various methods except
        the display method. So a subclas has to implement the display method.
 
@@ -194,10 +214,11 @@ class BaseMeter(WorkoutCallback):
         if self.metrics is None:
             metrics = workout.get_metrics()
             metrics = metrics.filter(self.exclude)
+        else:
+            metrics = self.metrics
 
 
-
-class NotebookMeter(WorkoutCallback):
+class NotebookMeter(Callback):
     '''Meter that displays the metrics and progress in
        a Jupyter notebook. This meter uses tqdm to display
        the progress bar.
@@ -243,13 +264,13 @@ class NotebookMeter(WorkoutCallback):
             if workout.has_metric(metric):
                 result += self._format(metric, workout.get_metric(metric))
 
-        pb = self._get_tqdm(workout)
-        pb.update(1)
+        progressbar = self._get_tqdm(workout)
+        progressbar.update(1)
         # pb.set_description(result, refresh=False)
-        pb.set_description(result)
+        progressbar.set_description(result)
 
 
-class TensorBoardMeter(WorkoutCallback):
+class TensorBoardMeter(Callback):
     '''Log the metrics to a tensorboard file so they can be reviewed
        in tensorboard. Currently supports the following type for metrics:
 
