@@ -22,6 +22,7 @@ import torch.nn as nn
 from torch.jit import trace
 from .callbacks import PrintMeter
 
+# pylint: disable=W0622
 
 class Phase(Enum):
     '''Identifies the stage the training is in'''
@@ -58,8 +59,9 @@ class SmartHistory(dict):
 
 
 class Workout(nn.Module):
-    '''Coordinates all the training of a model Workout and provides many methods that
-       reduces the amount of boilerplate code when training a model. In its the simplest form:
+    '''Coordinates all the training of a model and provides many methods that
+       reduces the amount of boilerplate code when training a model. In its the simplest form it can be
+       used as follows:
 
        .. code-block:: python
 
@@ -95,7 +97,7 @@ class Workout(nn.Module):
         self.step = 0
         self.epoch = 0
         self.batches = None
-        self.id = str(int(time.time()))
+        self._id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(
             model.parameters(), lr=1e-3)
 
@@ -155,13 +157,14 @@ class Workout(nn.Module):
         step = step if step is not None else self.step
         return self.history[name][step]
 
-    def forward(self, input, target):
+    def forward(self, *minibatch):
         '''Implementation of the forward method in nn.Module
 
            Args:
                input (Tensor): the input data for the model
                target (Tensor): the target data for the loss function
         '''
+        input, target = minibatch
         pred = self.model(input)
         loss = self.loss_fn(pred, target)
         return loss, pred
@@ -193,14 +196,14 @@ class Workout(nn.Module):
             pred = self.model(input)
             return pred
 
-    def validate(self, minibatch: tuple):
+    def validate(self, *minibatch):
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value. The data will be moved to the
            device using the configured mover.
 
            Args:
-               minibatch: the input and target tensor as a tuple
+               minibatch: the input and target tensor
         '''
         self.model.eval()
         with torch.set_grad_enabled(False):
@@ -208,7 +211,7 @@ class Workout(nn.Module):
             loss, pred = self(input, target)
             return self.update_metrics(loss, pred, target, "valid")
 
-    def update(self, minibatch: tuple):
+    def update(self, *minibatch):
         '''Perform a single learning step. This method is normally invoked by
            the train method but can also be invoked directly. If there are
            metrics configured, they will be invoked and the result is returned
@@ -216,7 +219,7 @@ class Workout(nn.Module):
            device using the configured mover.
 
            Args:
-               minibatch: the input and target tensors as a tuple
+               minibatch: the input and target tensors
         '''
         self.model.train()
         with torch.set_grad_enabled(True):
@@ -233,27 +236,9 @@ class Workout(nn.Module):
         training is not progressing anymore.'''
         raise StopError()
 
-    def state_dict(self):
-        return {
-            "step": self.step,
-            "id": self.id,
-            "model": self.model.state_dict(),
-            "epoch": self.epoch,
-            "history": self.history,
-            "optim": self.optim.state_dict()
-        }
-
     def _invoke_callbacks(self, callbacks, phase):
         for callback in callbacks:
             callback(self, phase)
-
-    def load_state_dict(self, state: dict):
-        self.id = state["id"]
-        self.step = state["step"]
-        self.epoch = state["epoch"]
-        self.history = state["history"]
-        self.model.load_state_dict(state["model"])
-        self.optim.load_state_dict(state["optim"])
 
     def fit(self, data, valid_data=None, epochs=1, callbacks=PrintMeter()):
         '''Run the training and optionally the validation for a number of epochs.
@@ -281,12 +266,12 @@ class Workout(nn.Module):
                 self.epoch += 1
 
                 for minibatch in data:
-                    self.update(minibatch)
+                    self.update(*minibatch)
                     self._invoke_callbacks(callbacks, "train")
 
                 if valid_data is not None:
                     for minibatch in valid_data:
-                        self.validate(minibatch)
+                        self.validate(*minibatch)
 
                 self.update_history("epoch", self.epoch)
                 self._invoke_callbacks(callbacks, "train")
@@ -314,11 +299,22 @@ class Workout(nn.Module):
         '''
 
         if filename is None:
-            subdir = "./models/{}/".format(self.id)
+            subdir = "./models/{}/".format(self._id)
             if not os.path.exists(subdir):
                 os.makedirs(subdir)
             filename = "{}workout_{:08d}.pty".format(subdir, self.step)
-        torch.save(self.state_dict(), filename)
+
+
+        state = {
+            "step": self.step,
+            "id": self._id,
+            "model": self.model.state_dict(),
+            "epoch": self.epoch,
+            "history": self.history,
+            "optim": self.optim.state_dict()
+        }
+
+        torch.save(state, filename)
         return filename
 
     def load(self, filename: str = None):
@@ -337,8 +333,46 @@ class Workout(nn.Module):
         if filename is None:
             filename = _find_latest_training("./models/")
 
-        self.load_state_dict(torch.load(filename))
+        state = torch.load(filename)
+        self._id = state["id"]
+        self.step = state["step"]
+        self.epoch = state["epoch"]
+        self.history = state["history"]
+        self.model.load_state_dict(state["model"])
+        self.optim.load_state_dict(state["optim"])
         return filename
+
+
+    def print_params(self):
+        '''Print an overview of the model parameters, their status and their names.
+        '''
+        for idx, (name, layer) in enumerate(self.model.named_parameters()):
+            text = "[unfrozen]" if layer.requires_grad else "[frozen]"
+            print("{:3} {:10} {:50} {}".format(idx, text, name, tuple(layer.shape)))
+
+    def _set_requires_grad(self, req_grad, param_name):
+        for name, param in self.model.named_parameters():
+            if name.startswith(param_name):
+                param.requires_grad = req_grad
+
+    def freeze(self, param_name=""):
+        '''Freeze a number of parameters based on their name. If no name is provided, it will freeze
+           all the parameters. See also print_params.
+
+           Args:
+              param_name (str): The first part of a parameter name. Can be a single string or a set of strings.
+        '''
+        self._set_requires_grad(False, param_name)
+
+    def unfreeze(self, param_name=""):
+        '''Unfreeze a number of parameters based on their name. If no name is provided, it will unfreeze
+           all the parameters. See also print_params.
+
+           Args:
+              layerparam_name_name (str): The first part of the parameter name. Can be a single string or a set of strings.
+        '''
+        self._set_requires_grad(True, param_name)
+
 
 
 def _find_latest_training(rootdir: str):
@@ -351,7 +385,7 @@ def _find_latest_training(rootdir: str):
         subdir = sorted(os.listdir(rootdir))[-1]
         filename = sorted(os.listdir(rootdir + subdir))[-1]
         return os.path.join(rootdir, subdir, filename)
-    except BaseException:
+    except OSError:
         logging.warning(
             "Couldn't find previously saved training files at directory %s",
             rootdir)
@@ -400,7 +434,7 @@ class Mover():
             return tuple(self(elem) for elem in batch)
 
         if isinstance(batch, np.ndarray):
-            batch = torch.from_numpy(batch)
+            batch = torch.from_numpy(batch) # pylint: disable=E1101
             return batch.to(device=self.device, non_blocking=self.non_blocking)
 
         logging.warning(

@@ -1,9 +1,9 @@
 '''
 This module contains the various metrics that can used to monitor the progress during training.
 '''
-
+import math
 from abc import abstractmethod
-
+# pylint: disable=C0103, W0612, R0903
 
 class Metric():
     '''This is the interface that needs to be implemented
@@ -32,19 +32,19 @@ class BinaryAccuracy(Metric):
         self.sigmoid = sigmoid
         self.threshold = threshold
 
-    def __call__(self, input, target):
-        input = input.flatten(1)
+    def __call__(self, pred, target):
+        pred = pred.flatten(1)
         target = target.flatten(1)
 
-        assert input.shape == target.shape, "Shapes of target and predicted values should be same"
+        assert pred.shape == target.shape, "Shapes of target and predicted values should be same"
 
         if self.sigmoid:
-            input = input.sigmoid()
+            pred = pred.sigmoid()
 
-        input = (input > self.threshold).int()
+        pred = (pred > self.threshold).int()
         target = target.int()
 
-        return (input == target).float().mean()
+        return (pred == target).float().mean()
 
 
 class SingleClassAccuracy(Metric):
@@ -79,3 +79,84 @@ def plot_metrics(plt, workout, metrics):
     plt.ylabel("values")
     plt.legend(metrics)
     return plt.show()
+
+
+
+
+def _get_sum(tensor):
+    return tensor.float().sum(dim=0).mean().item()
+
+class ConfusionMetric(Metric):
+    '''Calculate the TP, FP, TN and FN for the predicted classes.
+       There are several calculators available that use these base metrics
+       to calculate for example recall, precision or beta scores.
+
+       Args:
+           threshold: what threshold to use to say a probabity represents a true label
+           sigmoid: should a sigmoid be applied before determining true labels
+
+       Example usage:
+
+       .. code-block:: python
+
+            metric = ConfusionMetric(threshold=0.5, sigmoid=True)
+            model  = Supervisor(..., metrics = {"tp": metric})
+            meter  = TensorBoardMeter(metrics={"tp": RecallCalculator()})
+    '''
+
+    def __init__(self, threshold=0., sigmoid=False):
+        self.sigmoid = sigmoid
+        self.threshold = threshold
+
+    def __call__(self, y, t):
+
+        y = y.flatten(1)
+        t = t.flatten(1)
+
+        assert y.shape == t.shape, "Shapes of target and predicted values should be same"
+
+        if self.sigmoid:
+            y = y.sigmoid()
+
+        y = (y > self.threshold).int().cpu()
+        t = t.int().cpu()
+
+        return (
+            _get_sum(y * t), #tp
+            _get_sum(y > t), #fp
+            _get_sum(y < t), #fn
+            _get_sum((1 - y) * (1 - t)) #tn
+        )
+
+
+
+class Precision(ConfusionMetric):
+    '''Precision metric'''
+
+    def __call__(self, y, t):
+        tp, fp, fn, tn = super().__call__(y, t)
+        return tp/(tp+fp)
+
+
+class Recall(ConfusionMetric):
+    '''Recall metric'''
+
+    def __call__(self, y, t):
+        tp, fp, fn, tn = super().__call__(y, t)
+        return tp/(tp+fn)
+
+
+class F1Score(ConfusionMetric):
+    '''F1 Score metric'''
+
+    def __call__(self, y, t):
+        tp, fp, fn, tn = super().__call__(y, t)
+        return 2*tp/(2*tp+fn+fp)
+
+
+class MCC(ConfusionMetric):
+    '''MCC metric'''
+
+    def __call__(self, y, t):
+        tp, fp, fn, tn = super().__call__(y, t)
+        return (tp*tn - fp*fn)/math.sqrt((tp+fp)*(tp+fn)*(tn+fp*(tn+fn)))

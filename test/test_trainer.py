@@ -33,7 +33,7 @@ def test_trainer():
 
     valid_data = get_data(100)
     for minibatch in valid_data:
-        workout.validate(minibatch)
+        workout.validate(*minibatch)
     assert workout.epoch == 11
 
     workout.fit(data, valid_data, epochs=5)

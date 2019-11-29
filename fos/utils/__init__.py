@@ -2,6 +2,7 @@ from abc import abstractmethod
 import torch
 import numpy as np
 
+from .freezer import *
 
 class BaseDataset(torch.utils.data.Dataset):
     '''Base Dataset that could be subclassed.
@@ -206,8 +207,8 @@ def init_random(seed=0, cudnn=False):
         optimimalizations of CuDNN. This might impact performance, so only recommended if
         really required. default = False
     '''
-    torch.manual_seed(0)
-    np.random.seed(0)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
     if cudnn:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False

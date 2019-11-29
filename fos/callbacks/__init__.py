@@ -6,6 +6,7 @@ import logging
 from abc import abstractmethod
 from collections import OrderedDict
 from tqdm import tqdm
+# pylint: disable=R0903
 
 
 def _get_metrics2process(workout, metrics: [str]):
@@ -132,45 +133,6 @@ class SilentMeter(Callback):
         pass
 
 
-class PrintMeter(Callback):
-    '''Displays the metrics by using a simple print
-       statement the end of an epoch
-
-       If you use this in a shell script, please be aware that
-       by default Python buffers the output. You can change this
-       behaviour by using the `-u` option. See also:
-
-       `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
-
-       Args:
-           metrics: which metrics should be printed.
-
-    '''
-
-    def __init__(self, metrics=["loss", "val_loss"]):
-        self.metrics = metrics
-
-    def _format(self, key, value):
-        try:
-            value = float(value)
-            result = " - {} : {:.6f} ".format(key, value)
-        except BaseException:
-            result = " - {} : {} ".format(key, value)
-        return result
-
-    def __call__(self, workout, phase: str):
-        if phase != "valid":
-            return
-        result = "{:6}:{:6}".format(workout.epoch, workout.step)
-        for metric in self.metrics:
-            if workout.has_metric(metric):
-                value = workout.get_metric(metric)
-                if value is not None:
-                    result += self._format(metric, value)
-        print(result)
-
-
-
 
 class BaseMeter(Callback):
     '''Base meter that provides a default implementation for the various methods except
@@ -203,18 +165,59 @@ class BaseMeter(Callback):
     '''
 
     def __init__(self, metrics=None, exclude=None):
-        self.metrics = metrics if metrics is not None else OrderedDict()
-        self.exclude = exclude if exclude is not None else []
-        self.dynamic = True if metrics is None else False
-        self.updated = {}
+        self.metrics = metrics
+        self.exclude = exclude
 
+    def get_metrics(self, workout):
+        '''Get the metrics to process'''
 
-    def __call__(self, workout, phase):
         if self.metrics is None:
             metrics = workout.get_metrics()
-            metrics = metrics.filter(self.exclude)
+            if self.exclude is not None:
+                metrics = list(filter(lambda m: m not in self.exclude, metrics))  
         else:
             metrics = self.metrics
+        return metrics
+
+    @abstractmethod
+    def __call__(self, workout, phase: str):
+        pass
+
+
+class PrintMeter(BaseMeter):
+    '''Displays the metrics by using a simple print
+       statement the end of an epoch
+
+       If you use this in a shell script, please be aware that
+       by default Python buffers the output. You can change this
+       behaviour by using the `-u` option. See also:
+
+       `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
+
+       Args:
+           metrics: which metrics should be printed.
+
+    '''
+    def _format(self, key, value):
+        try:
+            value = float(value)
+            result = " - {} : {:.6f} ".format(key, value)
+        except ValueError:
+            result = " - {} : {} ".format(key, value)
+        return result
+
+    def __call__(self, workout, phase: str):
+        if phase != "valid":
+            return
+        result = "{:6}:{:6}".format(workout.epoch, workout.step)
+        for metric in self.get_metrics(workout):
+            value = workout.get_metric(metric)
+            if value is not None:
+                result += self._format(metric, value)
+        print(result)
+
+
+
 
 
 class NotebookMeter(Callback):
@@ -241,7 +244,7 @@ class NotebookMeter(Callback):
         try:
             value = float(value)
             result = "{}={:.5f} ".format(key, value)
-        except BaseException:
+        except ValueError:
             result = "{}={} ".format(key, value)
         return result
 
@@ -328,7 +331,7 @@ class TensorBoardMeter(Callback):
         try:
             value = float(value)
             self.writer.add_scalar(name, value, step)
-        except BaseException:
+        except ValueError:
             logging.warning("ignoring metric %s", name)
 
     def __call__(self, workout, phase):
@@ -360,15 +363,12 @@ class ParamHistogram(Callback):
        model. So typically you don't run this every step (see also the skip argument below).
 
        Arguments:
-           writer: which Tensorboard writer to use, if none is speficied the default SummaryWriter is be used.
+           writer: which Tensorboard writer to use.
            prefix (str): do you want to groep the metrics under a common "card" within tensorboard.
            skip (int): how many steps to skip until the next histograms are generated. If
            you run this metric every step it will slown down the training. Default is 500
            include_weight (bool): Should it include the weights in the histograms
            include_gradient (bool): Should it include the gradients int the histograms
-           predictor_only (bool): should it only assess the predictor model or the whole SupervisedModel,
-           so including the loss function. Mot of the time predictor_only is all that is required
-           since loss functions don't have learnable parameters.
     '''
 
     def __init__(self, writer=None, prefix="", skip=500,
@@ -389,7 +389,7 @@ class ParamHistogram(Callback):
 
     def __call__(self, workout, phase):
 
-        model = workout.model    
+        model = workout.model
 
         if (model.step % self.skip) != 0:
             return
@@ -404,12 +404,7 @@ class ParamHistogram(Callback):
                 name = "gradient/" + k
                 self._write(name, v.grad, workout.step)
 
-   
     def _write(self, name, value, step):
-        try:
-            value = self._get_np(value)
-            name = self.prefix + name
-            self.writer.add_histogram(name, value, step)
-        except BaseException:
-            logging.warning("ignored metric %s", name)
-
+        value = self._get_np(value)
+        name = self.prefix + name
+        self.writer.add_histogram(name, value, step)

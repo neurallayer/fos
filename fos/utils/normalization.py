@@ -25,8 +25,8 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
         n = get_normalization(image_loader, 1000, 1)
     '''
 
-    s = 0.
-    m = 0.
+    std = 0.
+    mean = 0.
     step = 0
     first = True
 
@@ -48,7 +48,7 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
             axis = tuple(axis)
             first = False
 
-        s += np.std(data, axis=axis)
-        m += np.mean(data, axis=axis)
+        std += np.std(data, axis=axis)
+        meam += np.mean(data, axis=axis)
 
-    return {"mean": m / step, "std": s / step}
+    return {"mean": mean / step, "std": std / step}
