@@ -18,15 +18,15 @@ class BaseDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         identifier = self.get_id(idx)
 
-        input = self.get_x(identifier)
+        x_sample = self.get_x(identifier)
         if self.transform is not None:
-            input = self.transform(input)
+            x_sample = self.transform(x_sample)
 
-        target = self.get_y(identifier)
+        y_sample = self.get_y(identifier)
         if self.transform_y is not None:
-            target = self.transform_y(target)
+            y_sample = self.transform_y(y_sample)
 
-        return input, target
+        return x_sample, y_sample
 
     def get_id(self, idx):
         '''default implementation returns the idx
@@ -118,9 +118,9 @@ class SmartOptimizer():
 
     def _clip(self):
         max_norm, norm_type = self.clipper
-        for p in self.optim.param_groups:
+        for group in self.optim.param_groups:
             torch.nn.utils.clip_grad_norm_(
-                p["params"], max_norm=max_norm, norm_type=norm_type)
+                group["params"], max_norm=max_norm, norm_type=norm_type)
 
     def step(self):
         if self.clipper is not None:
@@ -170,7 +170,7 @@ class Skipper():
     '''
 
     def __init__(self, dl, skip):
-        self.dl = dl
+        self._dl = dl
         self.skip = skip
         self.cnt = 1
 
@@ -181,7 +181,7 @@ class Skipper():
         return 0
 
     def _get_iter(self):
-        return self.dl.__iter__() if ((self.cnt % self.skip) == 0) else iter([])
+        return self._dl.__iter__() if ((self.cnt % self.skip) == 0) else iter([])
 
     def __iter__(self):
         i = self._get_iter()

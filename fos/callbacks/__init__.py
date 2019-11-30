@@ -174,7 +174,7 @@ class BaseMeter(Callback):
         if self.metrics is None:
             metrics = workout.get_metrics()
             if self.exclude is not None:
-                metrics = list(filter(lambda m: m not in self.exclude, metrics))  
+                metrics = list(filter(lambda m: m not in self.exclude, metrics))
         else:
             metrics = self.metrics
         return metrics
@@ -226,10 +226,10 @@ class NotebookMeter(Callback):
        the progress bar.
     '''
 
-    def __init__(self, metrics=["loss", "val_loss"]):
+    def __init__(self, metrics=None):
         self.tqdm = None
         self.epoch = -1
-        self.metrics = metrics
+        self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
 
     def _get_tqdm(self, workout):
@@ -303,36 +303,15 @@ class TensorBoardMeter(Callback):
           ...
     '''
 
-    def __init__(self, writer=None, metrics=["loss", "val_loss"], prefix=""):
+    def __init__(self, writer=None, metrics=None, prefix=""):
         super().__init__()
         self.writer = writer
-        self.metrics = metrics
+        self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.prefix = prefix
 
     def set_writer(self, writer):
         '''Set the writer to use for logging the metrics'''
         self.writer = writer
-
-    def _write(self, name, value, step):
-        if isinstance(value, dict):
-            for k, v in value.items():
-                self._write(name + "/" + k, v, step)
-            return
-
-        if isinstance(value, str):
-            self.writer.add_text(name, value, step)
-            return
-
-        if isinstance(value, list):
-            for idx, v in enumerate(value):
-                self._write(name + "/" + str(idx + 1), v, step)
-            return
-
-        try:
-            value = float(value)
-            self.writer.add_scalar(name, value, step)
-        except ValueError:
-            logging.warning("ignoring metric %s", name)
 
     def __call__(self, workout, phase):
         for metric in self.metrics:
@@ -340,7 +319,12 @@ class TensorBoardMeter(Callback):
                 value = workout.get_metric(metric)
                 if value is not None:
                     name = self.prefix + metric
-                    self._write(name, value, workout.step)
+                    try:
+                        value = float(value)
+                        self.writer.add_scalar(name, value, workout.step)
+                    except ValueError:
+                        logging.warning("ignoring metric %s", name)
+
 
 
 class ParamHistogram(Callback):
@@ -394,15 +378,15 @@ class ParamHistogram(Callback):
         if (model.step % self.skip) != 0:
             return
 
-        for k, v in model.named_parameters():
+        for param_name, param in model.named_parameters():
 
             if self.include_weight:
-                name = "weight/" + k
-                self._write(name, v.data, workout.step)
+                name = "weight/" + param_name
+                self._write(name, param.data, workout.step)
 
-            if self.include_gradient and hasattr(v, "grad"):
-                name = "gradient/" + k
-                self._write(name, v.grad, workout.step)
+            if self.include_gradient and hasattr(param, "grad"):
+                name = "gradient/" + param_name
+                self._write(name, param.grad, workout.step)
 
     def _write(self, name, value, step):
         value = self._get_np(value)
