@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+from fos import Workout
 from fos.utils import *
 from fos.utils.normalization import *
 from fos.utils.schedulers import *
@@ -11,12 +12,11 @@ from torchvision.models import resnet18
 
 def test_freezer():
     model = resnet18()
-    freezer = Freezer(model)
-    freezer.summary()
+    w = Workout(model,None)
     assert model.fc.weight.requires_grad == True
-    freezer.freeze()
+    w.freeze()
     assert model.fc.weight.requires_grad == False
-    freezer.unfreeze("fc")
+    w.unfreeze("fc")
     assert model.fc.weight.requires_grad == True
     
 def test_normalization():

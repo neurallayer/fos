@@ -2,50 +2,43 @@ from unittest.mock import Mock
 
 # The standard meters that are being provided.
 from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter
+from fos import Workout
+import torch.nn.functional as F
+import torch.nn as nn
 
 
-class SmartMetric():
-    def reset(self):
-        pass
-    
-    def update(self, *args):
-        pass
-    
-    def get(self):
-        return "mymetric", 1.
+def get_model():
+    return nn.Sequential(
+        nn.Linear(10, 32),
+        nn.ReLU(),
+        nn.Linear(32, 1))
 
 
-def init_meter(meter, steps):
-    metric = SmartMetric()
-    for i in range(steps):
-        meter.display([metric], {"phase":"train", "step": i+1, "epoch":1, "progress":0.5})
-    
+def get_workout():
+    workout = Workout(get_model(), F.mse_loss)
+    workout.batches = 10
+    return workout
+
     
 def test_printmeter():
     meter = PrintMeter()
-    cnt = 10
-    init_meter(meter, cnt) 
-    state = meter.state_dict()
-    assert state == None
+    workout = get_workout()
+    meter(workout, "valid")
     
 
 def test_notebookmeter():
     meter = NotebookMeter()
-    meter.tqdm = Mock()
-    cnt = 10
-    init_meter(meter, cnt)
-    state = meter.state_dict()
-    assert state == None
-
+    workout = get_workout()
     
+    meter(workout, "valid")
+
 
 def _test_tensorboardmeter():
     writer = Mock()
+    workout = get_workout()
     meter = TensorBoardMeter(writer=writer)
-    init_meter(meter, 10)
+    meter(workout, "valid")
     writer.add_scalar.assert_called()
-    meter.reset()
-    init_meter(meter, 10)
-    writer.add_scalar.assert_called()
+
 
     
