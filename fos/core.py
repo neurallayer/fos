@@ -60,8 +60,8 @@ class SmartHistory(dict):
 
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that
-       reduces the amount of boilerplate code when training a model. In its the simplest form it can be
-       used as follows:
+       reduces the amount of boilerplate code when training a model. In its the simplest form
+       it can be used as follows:
 
        .. code-block:: python
 
@@ -360,16 +360,18 @@ class Workout(nn.Module):
            all the parameters. See also print_params.
 
            Args:
-              param_name (str): The first part of a parameter name. Can be a single string or a set of strings.
+              param_name (str): The first part of a parameter name. Can be a single string or
+              a set of strings.
         '''
         self._set_requires_grad(False, param_name)
 
     def unfreeze(self, param_name=""):
-        '''Unfreeze a number of parameters based on their name. If no name is provided, it will unfreeze
-           all the parameters. See also print_params.
+        '''Unfreeze a number of parameters based on their name. If no name is provided, it will
+           unfreeze all the parameters. See also print_params.
 
            Args:
-              layerparam_name_name (str): The first part of the parameter name. Can be a single string or a set of strings.
+              layerparam_name_name (str): The first part of the parameter name. Can be a single
+              string or a set of strings.
         '''
         self._set_requires_grad(True, param_name)
 
