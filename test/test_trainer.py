@@ -3,9 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fos import Workout
-from fos.callbacks import SilentMeter
-
-
 
 def get_model():
     return nn.Sequential(
@@ -100,4 +97,4 @@ def test_trainer_metrics():
     workout.fit(data, data)
     assert workout.epoch == 1
 
-test_trainer()
+

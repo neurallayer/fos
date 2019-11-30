@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
 # The standard meters that are being provided.
-from fos.meters import PrintMeter, MultiMeter, NotebookMeter, MemoryMeter, TensorBoardMeter
+from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter
 
 
 class SmartMetric():
@@ -28,12 +28,6 @@ def test_printmeter():
     state = meter.state_dict()
     assert state == None
     
-def test_multimeter():
-    meter = MultiMeter(MemoryMeter(), MemoryMeter())
-    cnt = 10
-    init_meter(meter, cnt) 
-    state = meter.state_dict()
-    assert len(state) == 2
 
 def test_notebookmeter():
     meter = NotebookMeter()
@@ -44,29 +38,7 @@ def test_notebookmeter():
     assert state == None
 
     
-def test_memorymeter():
-    meter = MemoryMeter()
-    cnt = 10
-    init_meter(meter, cnt)
 
-
-    steps, values = meter.get_history("mymetric")
-    assert len(steps) == len(values)
-    assert len(steps) == cnt
-
-    steps, values = meter.get_history("mymetric_")
-    assert len(steps) == 0
-    
-    state = meter.state_dict()
-    assert len(state) > 0
-    
-    meter.reset()
-    meter.load_state_dict(state)
-    steps, values = meter.get_history("mymetric")
-    assert len(steps) == len(values)
-    assert len(steps) == cnt
-
-    
 def _test_tensorboardmeter():
     writer = Mock()
     meter = TensorBoardMeter(writer=writer)

@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 from fos.utils import *
-from fos.utils.freezer import *
 from fos.utils.normalization import *
 from fos.utils.schedulers import *
 import torch
@@ -32,5 +31,6 @@ def test_scheduler():
     model = resnet18()
     optim = torch.optim.Adam(model.parameters())
     scheduler = CosineAnnealingRestartsLR(optim, T=1)
+    optim.step()
     for i in range(100):
         scheduler.step()

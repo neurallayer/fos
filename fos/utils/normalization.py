@@ -49,6 +49,6 @@ def get_normalization(dataloader, max_iter=None, feature_dim=1):
             first = False
 
         std += np.std(data, axis=axis)
-        meam += np.mean(data, axis=axis)
+        mean += np.mean(data, axis=axis)
 
     return {"mean": mean / step, "std": std / step}

@@ -2,7 +2,6 @@ from abc import abstractmethod
 import torch
 import numpy as np
 
-from .freezer import *
 
 class BaseDataset(torch.utils.data.Dataset):
     '''Base Dataset that could be subclassed.

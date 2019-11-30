@@ -1,9 +1,7 @@
 from unittest.mock import Mock
 
-from fos import Supervisor
+from fos import Workout
 from fos.metrics import *
-from fos.metrics.modelmetrics import *
-from fos.metrics.confusion import *
 import torch
 from torchvision.models import resnet18
 

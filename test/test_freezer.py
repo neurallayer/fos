@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fos import Supervisor, Trainer
-from fos.meters import NotebookMeter
+from fos import Workout
+from fos.callbacks import NotebookMeter
 
 def get_predictor():
     return nn.Sequential(
