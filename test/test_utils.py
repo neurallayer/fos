@@ -2,8 +2,6 @@ from unittest.mock import Mock
 
 from fos import Workout
 from fos.utils import *
-from fos.utils.normalization import *
-from fos.utils.schedulers import *
 import torch
 import torch.nn.functional as F
 from torchvision.models import resnet18
@@ -12,25 +10,16 @@ from torchvision.models import resnet18
 
 def test_freezer():
     model = resnet18()
-    w = Workout(model,None)
-    assert model.fc.weight.requires_grad == True
-    w.freeze()
-    assert model.fc.weight.requires_grad == False
-    w.unfreeze("fc")
-    assert model.fc.weight.requires_grad == True
+    assert model.fc.weight.requires_grad
+    freeze(model)
+    assert not model.fc.weight.requires_grad
+    unfreeze(model, "fc")
+    assert model.fc.weight.requires_grad
     
 def test_normalization():
-    dataloader = torch.randn(1000,100,100)
+    dataloader = torch.randn(1000, 100, 100)
     n = get_normalization(dataloader, 100)
     assert "mean" in n
     assert "std" in n
     assert len(n["mean"]) == 100
     
-    
-def test_scheduler():
-    model = resnet18()
-    optim = torch.optim.Adam(model.parameters())
-    scheduler = CosineAnnealingRestartsLR(optim, T=1)
-    optim.step()
-    for i in range(100):
-        scheduler.step()

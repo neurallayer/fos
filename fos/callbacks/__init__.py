@@ -4,10 +4,12 @@ of functionality
 
 import logging
 from abc import abstractmethod
+from typing import List
 from collections import OrderedDict
 from tqdm import tqdm
 # pylint: disable=R0903
 
+Metrics = List[str]
 
 def _get_metrics2process(workout, metrics: [str]):
     return [m for m in metrics if workout.has_metric(m)]
@@ -48,7 +50,7 @@ class EarlyStop(Callback):
        This is checked at the end of every epoch.
     '''
 
-    def __init__(self, metric="val_loss", minimize=True):
+    def __init__(self, metric: str = "val_loss", minimize: bool = True):
         self.metric = metric
         self.minimize = minimize
         self.value = float('Inf') if minimize else -float('Inf')
@@ -72,7 +74,7 @@ class AutoSave(Callback):
        is run at the end of every epoch.
     '''
 
-    def __init__(self, metric="val_loss", minimize=True, filename=None):
+    def __init__(self, metric: str = "val_loss", minimize: bool = True, filename: str = None):
         self.metric = metric
         self.minimize = minimize
         self.value = float('Inf') if minimize else -float('Inf')
@@ -103,7 +105,7 @@ class RegisterLR(Callback):
        This callback supports optimizers with multiple parameter groups
     '''
 
-    def __init__(self, prefix="lr_"):
+    def __init__(self, prefix: str = "lr_"):
         self.prefix = prefix
 
     def __call__(self, workout, phase: str):
@@ -117,7 +119,7 @@ class EpochSave(Callback):
     '''Save the model at the end of every epoch.
     '''
 
-    def __init__(self, filename=None):
+    def __init__(self, filename: str = None):
         self.filename = filename
 
     def __call__(self, workout, phase: str):
@@ -129,62 +131,11 @@ class EpochSave(Callback):
 class SilentMeter(Callback):
     '''Silently ignore all the metrics and don't produce any output'''
 
-    def __call__(self, workout, phase):
-        pass
-
-
-
-class BaseMeter(Callback):
-    '''Base meter that provides a default implementation for the various methods except
-       the display method. So a subclas has to implement the display method.
-
-       Behaviour rules when creating an instance:
-           1. If nothing is specified, it will record all metrics using the average
-           calculator.
-
-            2. If only one or more exclude metrics are specifified, it will record all
-            metrics except the ones listed in the exclude argument.
-
-            3. If metrics are provided, only record those metrics and ignore other metrics.
-            The exclude argument is also ignored in this case.
-
-       Args:
-           metrics (dict): the metrics and their calculators that should be
-               handled. If this argument is provided, metrics not mentioned
-               will be ignored by this meter. If no value is provided, the
-               meter will handle all the metrics.
-           exclude (list): list of metrics to ignore
-
-       Example usage:
-
-       .. code-block:: python
-
-           meter = some_meter()
-           meter = some_meter(metrics={"acc": MomentumMeter(), "val_acc": AvgMeter()})
-           meter = some_meter(exclude=["vall_loss"])
-    '''
-
-    def __init__(self, metrics=None, exclude=None):
-        self.metrics = metrics
-        self.exclude = exclude
-
-    def get_metrics(self, workout):
-        '''Get the metrics to process'''
-
-        if self.metrics is None:
-            metrics = workout.get_metrics()
-            if self.exclude is not None:
-                metrics = list(filter(lambda m: m not in self.exclude, metrics))
-        else:
-            metrics = self.metrics
-        return metrics
-
-    @abstractmethod
     def __call__(self, workout, phase: str):
         pass
 
 
-class PrintMeter(BaseMeter):
+class PrintMeter(Callback):
     '''Displays the metrics by using a simple print
        statement the end of an epoch
 
@@ -198,6 +149,10 @@ class PrintMeter(BaseMeter):
            metrics: which metrics should be printed.
 
     '''
+
+    def __init__(self, metrics: Metrics = None):
+        self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
+
     def _format(self, key, value):
         try:
             value = float(value)
@@ -210,10 +165,9 @@ class PrintMeter(BaseMeter):
         if phase != "valid":
             return
         result = "{:6}:{:6}".format(workout.epoch, workout.step)
-        for metric in self.get_metrics(workout):
-            value = workout.get_metric(metric)
-            if value is not None:
-                result += self._format(metric, value)
+        for metric in self.metrics:
+            if workout.has_metric(metric):
+                result += self._format(metric, workout.get_metric(metric))
         print(result)
 
 
@@ -226,7 +180,7 @@ class NotebookMeter(Callback):
        the progress bar.
     '''
 
-    def __init__(self, metrics=None):
+    def __init__(self, metrics: Metrics = None):
         self.tqdm = None
         self.epoch = -1
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
@@ -303,7 +257,7 @@ class TensorBoardMeter(Callback):
           ...
     '''
 
-    def __init__(self, writer=None, metrics=None, prefix=""):
+    def __init__(self, writer=None, metrics: Metrics = None, prefix=""):
         super().__init__()
         self.writer = writer
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]

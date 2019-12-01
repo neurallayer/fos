@@ -3,6 +3,7 @@ This module contains the various metrics that can used to monitor the progress d
 '''
 import math
 from abc import abstractmethod
+from torch import Tensor
 # pylint: disable=C0103, W0612, R0903
 
 class Metric():
@@ -12,7 +13,9 @@ class Metric():
 
     @abstractmethod
     def __call__(self, y_pred, y_true):
-        '''calculate the metric
+        '''Calculate the metric value. Typically the y_pred and y_true are Tensors, but in more
+           complex scenarios they also can be tuples of Tensors (for example when a model
+           returns multiple tensors).
 
            Args:
                y_pred: the predicted output
@@ -32,7 +35,7 @@ class BinaryAccuracy(Metric):
         self.sigmoid = sigmoid
         self.threshold = threshold
 
-    def __call__(self, pred, target):
+    def __call__(self, pred: Tensor, target: Tensor):
         pred = pred.flatten(1)
         target = target.flatten(1)
 
@@ -54,7 +57,7 @@ class SingleClassAccuracy(Metric):
     def __init__(self, activation=None):
         self.activation = activation
 
-    def __call__(self, yp, y):
+    def __call__(self, yp: Tensor, y: Tensor):
         if self.activation is not None:
             yp = self.activation(yp)
 
@@ -82,8 +85,7 @@ def plot_metrics(plt, workout, metrics):
 
 
 
-
-def _get_sum(tensor):
+def _get_sum(tensor: Tensor) -> float:
     return tensor.float().sum(dim=0).mean().item()
 
 class ConfusionMetric(Metric):
@@ -108,7 +110,7 @@ class ConfusionMetric(Metric):
         self.sigmoid = sigmoid
         self.threshold = threshold
 
-    def __call__(self, y, t):
+    def __call__(self, y: Tensor, t: Tensor):
 
         y = y.flatten(1)
         t = t.flatten(1)

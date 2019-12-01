@@ -1,13 +1,11 @@
 '''
 The core module contains the basic functionality required to train a model.
-The only additional functionality you would normally include in your
-application is a `Meter` that will display the progress during the training.
 
 There are 3 classes in the core package:
 
-1) Supervisor, that creates a supervised model with a loss function
-2) Trainer, that will run the training including the validation
-3) Mover, that will move tensors to a device like a GPU
+1) Workout, that enables trainign a model with just a few lines of code
+2) Mover, that will move tensors to the desired device like a GPU
+3) SmartHistory, that will store the captured metrics
 
 '''
 
@@ -15,10 +13,11 @@ import time
 import os
 import logging
 from enum import Enum
-from typing import Callable
+from typing import Callable, Iterable, Tuple, List
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.optim import Optimizer
 from torch.jit import trace
 from .callbacks import PrintMeter
 
@@ -52,7 +51,7 @@ class SmartHistory(dict):
         super().__init__()
         self.momentum = momentum
 
-    def __setitem__(self, step: int, value):
+    def __setitem__(self, step: int, value: float):
         if step in self:
             value = self.momentum * self[step] + (1-self.momentum) * value
         super().__setitem__(step, value)
@@ -87,7 +86,8 @@ class Workout(nn.Module):
            workout = Workout(model, F.mse_loss, Adam(model.paramters()), acc=BinaryAccuracy())
     '''
 
-    def __init__(self, model: nn.Module, loss_fn: Callable, optim=None, mover=None, **metrics):
+    def __init__(self, model: nn.Module, loss_fn: Callable,
+                 optim: Optimizer = None, mover=None, **metrics):
         super().__init__()
         self.model = model
         self.metrics = metrics
@@ -101,7 +101,7 @@ class Workout(nn.Module):
         self.optim = optim if optim is not None else torch.optim.SGD(
             model.parameters(), lr=1e-3)
 
-    def update_history(self, name: str, value):
+    def update_history(self, name: str, value: float) -> None:
         ''''Update the history for the passed metric name and value. It will store
             store the metric under the current step.
         '''
@@ -109,7 +109,7 @@ class Workout(nn.Module):
             self.history[name] = SmartHistory()
         self.history[name][self.step] = value
 
-    def get_metricname(self, name: str, phase: str):
+    def get_metricname(self, name: str, phase: str) -> str:
         '''Get the fully qualified name for a metric. If phase equals train the
            metric name is as specified and if phase is "valid" the metric name
            is "val_" + name.
@@ -122,7 +122,7 @@ class Workout(nn.Module):
         '''
         return name if phase == "train" else "val_" + name
 
-    def update_metrics(self, loss, pred, target, phase: str):
+    def _update_metrics(self, loss, pred, target, phase: str) -> None:
         '''Invoke the configured metrics functions and return the result
 
            Args:
@@ -137,11 +137,11 @@ class Workout(nn.Module):
             fqname = self.get_metricname(name, phase)
             self.update_history(fqname, value)
 
-    def get_metrics(self):
+    def get_metrics(self) -> List[str]:
         '''Get all metrics that have at least one value logged'''
         return self.history.keys()
 
-    def has_metric(self, name: str, step=None):
+    def has_metric(self, name: str, step=None) -> bool:
         '''Check for the metric value for the provided metric name and step.
            True of it exist, False otherwise.
         '''
@@ -157,7 +157,7 @@ class Workout(nn.Module):
         step = step if step is not None else self.step
         return self.history[name][step]
 
-    def forward(self, *minibatch):
+    def forward(self, *minibatch) -> Tuple:
         '''Implementation of the forward method in nn.Module
 
            Args:
@@ -188,7 +188,7 @@ class Workout(nn.Module):
            the device using the configured mover.
 
            Args:
-               input (Tensor): the minibatch of only input tensors
+               input (Tensor): the minibatch of only the input tensors
         '''
         self.model.eval()
         with torch.set_grad_enabled(False):
@@ -196,7 +196,7 @@ class Workout(nn.Module):
             pred = self.model(input)
             return pred
 
-    def validate(self, *minibatch):
+    def validate(self, *minibatch) -> None:
         '''Perform a single validation iteration. If there are metrics
            configured, they will be invoked and the result is returned together
            with the loss value. The data will be moved to the
@@ -209,9 +209,9 @@ class Workout(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(minibatch)
             loss, pred = self(input, target)
-            return self.update_metrics(loss, pred, target, "valid")
+            self._update_metrics(loss, pred, target, "valid")
 
-    def update(self, *minibatch):
+    def update(self, *minibatch) -> None:
         '''Perform a single learning step. This method is normally invoked by
            the train method but can also be invoked directly. If there are
            metrics configured, they will be invoked and the result is returned
@@ -228,19 +228,19 @@ class Workout(nn.Module):
             loss.backward()
             self.optim.step()
             self.step += 1
-            self.update_metrics(loss, pred, target, "train")
+            self._update_metrics(loss, pred, target, "train")
             self.optim.zero_grad()
 
-    def stop(self):
+    def stop(self) -> None:
         '''Will stop the training early. Typcially invoked by a callback when the
         training is not progressing anymore.'''
         raise StopError()
 
-    def _invoke_callbacks(self, callbacks, phase):
+    def _invoke_callbacks(self, callbacks, phase) -> None:
         for callback in callbacks:
             callback(self, phase)
 
-    def fit(self, data, valid_data=None, epochs=1, callbacks=PrintMeter()):
+    def fit(self, data: Iterable, valid_data: Iterable = None, epochs=1, callbacks=PrintMeter()):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -279,7 +279,7 @@ class Workout(nn.Module):
         except StopError:
             pass
 
-    def save(self, filename: str = None):
+    def save(self, filename: str = None) -> str:
         '''Save the training state to a file. This includes the underlying model state
            but also the optimizer state and internal state. This makes it
            possible to continue training where it was left off.
@@ -317,7 +317,7 @@ class Workout(nn.Module):
         torch.save(state, filename)
         return filename
 
-    def load(self, filename: str = None):
+    def load(self, filename: str = None) -> str:
         '''Restore previously stored workout.
 
            If no filename is provided it will try to find the last stored training
@@ -343,41 +343,7 @@ class Workout(nn.Module):
         return filename
 
 
-    def print_params(self):
-        '''Print an overview of the model parameters, their status and their names.
-        '''
-        for idx, (name, layer) in enumerate(self.model.named_parameters()):
-            text = "[unfrozen]" if layer.requires_grad else "[frozen]"
-            print("{:3} {:10} {:50} {}".format(idx, text, name, tuple(layer.shape)))
-
-    def _set_requires_grad(self, req_grad, param_name):
-        for name, param in self.model.named_parameters():
-            if name.startswith(param_name):
-                param.requires_grad = req_grad
-
-    def freeze(self, param_name=""):
-        '''Freeze a number of parameters based on their name. If no name is provided, it will freeze
-           all the parameters. See also print_params.
-
-           Args:
-              param_name (str): The first part of a parameter name. Can be a single string or
-              a set of strings.
-        '''
-        self._set_requires_grad(False, param_name)
-
-    def unfreeze(self, param_name=""):
-        '''Unfreeze a number of parameters based on their name. If no name is provided, it will
-           unfreeze all the parameters. See also print_params.
-
-           Args:
-              layerparam_name_name (str): The first part of the parameter name. Can be a single
-              string or a set of strings.
-        '''
-        self._set_requires_grad(True, param_name)
-
-
-
-def _find_latest_training(rootdir: str):
+def _find_latest_training(rootdir: str) -> str:
     '''Find the last saved training file.
 
        Args:

@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
 # The standard meters that are being provided.
-from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter
+from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter, ParamHistogram
 from fos import Workout
 import torch.nn.functional as F
 import torch.nn as nn
@@ -40,5 +40,12 @@ def _test_tensorboardmeter():
     meter(workout, "valid")
     writer.add_scalar.assert_called()
 
+
+def test_paramhistogram():
+    writer = Mock()
+    loss = Mock()
+    cb = ParamHistogram(include_gradient=False)
+    model = Workout(predictor, loss, callbacks=cb)
+    assert writer.add_histogram.is_called()
 
     
