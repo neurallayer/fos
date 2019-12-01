@@ -44,9 +44,9 @@ def test_trainer_predict():
     optim = torch.optim.Adam(model.parameters())
     workout = Workout(model, loss, optim)
 
-    data = get_data(100)
+    data = torch.randn(16, 10)
     result = workout.predict(data)
-    assert len(result) == 100*16
+    assert len(result) == 16
 
 
 def test_trainer_state():
@@ -96,5 +96,3 @@ def test_trainer_metrics():
     data = get_data(100)
     workout.fit(data, data)
     assert workout.epoch == 1
-
-

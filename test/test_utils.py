@@ -1,10 +1,6 @@
-from unittest.mock import Mock
-
-from fos import Workout
-from fos.utils import *
 import torch
-import torch.nn.functional as F
 from torchvision.models import resnet18
+from fos.utils import get_normalization, freeze, unfreeze
 
 
 
@@ -15,7 +11,7 @@ def test_freezer():
     assert not model.fc.weight.requires_grad
     unfreeze(model, "fc")
     assert model.fc.weight.requires_grad
-    
+
 def test_normalization():
     dataloader = torch.randn(1000, 100, 100)
     n = get_normalization(dataloader, 100)

@@ -329,7 +329,7 @@ class ParamHistogram(Callback):
 
         model = workout.model
 
-        if (model.step % self.skip) != 0:
+        if (workout.step % self.skip) != 0:
             return
 
         for param_name, param in model.named_parameters():
