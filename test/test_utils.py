@@ -1,7 +1,7 @@
 import torch
 from torchvision.models import resnet18
 from fos.utils import get_normalization, freeze, unfreeze
-
+# pylint: disable=E1101
 
 
 def test_freezer():

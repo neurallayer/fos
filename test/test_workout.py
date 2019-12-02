@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fos import Workout
+# pylint: disable=E1101
 
 def get_model():
     return nn.Sequential(

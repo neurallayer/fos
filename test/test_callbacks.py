@@ -19,19 +19,15 @@ def get_workout():
     workout.batches = 10
     return workout
 
-    
 def test_printmeter():
     meter = PrintMeter()
     workout = get_workout()
-    meter(workout, "valid")
-    
+    meter(workout, "valid")  
 
 def test_notebookmeter():
     meter = NotebookMeter()
     workout = get_workout()
-    
     meter(workout, "valid")
-
 
 def _test_tensorboardmeter():
     writer = Mock()
