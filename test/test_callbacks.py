@@ -7,7 +7,7 @@ from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter, ParamHist
 from fos import Workout
 
 def get_workout():
-    workout = Workout(Mock(), Mock())
+    workout = Workout(Mock(), Mock(), optim=Mock(), mover=Mock())
     workout.batches = 10
     return workout
 
