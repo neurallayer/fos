@@ -3,54 +3,10 @@ Collection of utilities that come in handy when training a model. Typially these
 when optimizing training with more advanced concepts like freezing layers or
 annealing learning rates.
 """
-
-from abc import abstractmethod
+import random
 from typing import Iterable
 import torch
 import numpy as np
-
-
-class BaseDataset(torch.utils.data.Dataset):
-    '''Base Dataset that could be subclassed.
-    '''
-
-    def __init__(self, transform=None, transform_y=None):
-        self.transform = transform
-        self.transform_y = transform_y
-
-    @abstractmethod
-    def __len__(self):
-        '''length of the dataset'''
-
-    def __getitem__(self, idx):
-        identifier = self.get_id(idx)
-
-        x_sample = self.get_x(identifier)
-        if self.transform is not None:
-            x_sample = self.transform(x_sample)
-
-        y_sample = self.get_y(identifier)
-        if self.transform_y is not None:
-            y_sample = self.transform_y(y_sample)
-
-        return x_sample, y_sample
-
-    def get_id(self, idx):
-        '''default implementation returns the idx
-           as identifier and doesn't perform any mapping.
-        '''
-        return idx
-
-    @abstractmethod
-    def get_x(self, identifier):
-        '''Return the input value(s) for the model. In case there are multiple
-           values, return a tuple.
-        '''
-
-    @abstractmethod
-    def get_y(self, identifier):
-        '''Return the target value(s) for the model.In case there are multiple
-           values, return a tuple.'''
 
 
 class ScalableRandomSampler(torch.utils.data.Sampler):
@@ -198,9 +154,8 @@ class Skipper():
         self.cnt += 1
         return i
 
-
 def init_random(seed=0, cudnn=False):
-    '''Initialize the random seeds for `torch` and `numpy` in order to improve
+    '''Initialize the random seeds for `python`, `torch` and `numpy` in order to improve
     reproducability. This makes for example the initialization of
     weights in the different layers of the model reproducable.
 
@@ -216,12 +171,12 @@ def init_random(seed=0, cudnn=False):
         optimimalizations of CuDNN. This might impact performance, so only recommended if
         really required. default = False
     '''
+    random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     if cudnn:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
 
 def print_params(model):
     '''Print an overview of the model parameters, their status and their names. When you want
@@ -269,7 +224,7 @@ def get_normalization(dataloader: Iterable, max_iter=None, feature_dim=1):
 
     Args:
         dataloader: The datalaoder you want to use to get the images
-        max_iter: Limit the number of iterations. If None, all the iterations in the
+        max_iter: Limit the number of batches to consider. If None, all the iterations in the
          dataloader will be used. It should be noted that if a batch has more then one sample,
          the actual number of samples equals: samples = max_iter * batch_size
          feature_dim: which dimension has the features to normalize.

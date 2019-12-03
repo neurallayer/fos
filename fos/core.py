@@ -217,7 +217,7 @@ class Workout(nn.Module):
             callback(self, phase)
 
     def fit(self, data: Iterable, valid_data: Iterable = None,
-            epochs: int = 1, callbacks=PrintMeter()):
+            epochs: int = 1, callbacks=PrintMeter()) -> None:
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -343,7 +343,8 @@ class SmartHistory(dict):
     outcome of that calculation.
 
     If multiple values per step are received (like is the case with validation)
-    the moving average of the metric values are stored instead.
+    the moving average of the metric values are stored instead. So at every step
+    there is only a single value per metric.
 
     Args:
         momentum: The momentum to use for the moving average (default = 0.9). The
@@ -386,7 +387,7 @@ class Mover():
     def get_default(model: nn.Module):
         '''Get a mover based on the device on which the parameters of
            the model resides. This method is also called by the workout if
-           there is no mover provided as an argument when creating a new workout
+           there is no mover provided as an argument when creating a new workout.
         '''
         device = next(model.parameters()).device
         return Mover(device)
