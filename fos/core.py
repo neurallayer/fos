@@ -58,7 +58,7 @@ class Workout(nn.Module):
 
            workout = Workout(model, F.mse_loss, Adam(model.paramters()), acc=BinaryAccuracy())
     '''
-
+    # pylint: disable= R0902
     def __init__(self, model: nn.Module, loss_fn: Callable,
                  optim: Optimizer = None, mover=None, **metrics):
         super().__init__()
@@ -96,6 +96,7 @@ class Workout(nn.Module):
            "loss" : for the recorded loss during training
            "val_loss": or the recorded loss during validation
         '''
+        # pylint: disable= R0201
         return name if phase == "train" else "val_" + name
 
     def _update_metrics(self, loss, pred, target, phase: str) -> None:

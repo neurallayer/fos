@@ -152,11 +152,12 @@ class PrintMeter(Callback):
 
     def __init__(self, metrics: Metrics = None):
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
+        self.metric_format = " - {} : {:.6f} "
 
     def _format(self, key, value):
         try:
             value = float(value)
-            result = " - {} : {:.6f} ".format(key, value)
+            result = self.metric_format.format(key, value)
         except ValueError:
             result = " - {} : {} ".format(key, value)
         return result
@@ -185,6 +186,7 @@ class NotebookMeter(Callback):
         self.epoch = -1
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
+        self.metric_format = " - {} : {:.5f} "
 
     def _get_tqdm(self, workout):
         if self.tqdm is None:
@@ -197,7 +199,7 @@ class NotebookMeter(Callback):
     def _format(self, key, value):
         try:
             value = float(value)
-            result = "{}={:.5f} ".format(key, value)
+            result = self.metric_format.format(key, value)
         except ValueError:
             result = "{}={} ".format(key, value)
         return result
@@ -308,7 +310,7 @@ class ParamHistogram(Callback):
            include_weight (bool): Should it include the weights in the histograms
            include_gradient (bool): Should it include the gradients int the histograms
     '''
-
+    # pylint: disable=R0913
     def __init__(self, writer=None, prefix="", skip=500,
                  include_weight=True, include_gradient=True):
         self.writer = writer
