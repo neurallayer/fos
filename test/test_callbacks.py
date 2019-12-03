@@ -1,21 +1,13 @@
 # pylint: disable=C0116, C0114
 from unittest.mock import Mock
-import torch.nn.functional as F
-import torch.nn as nn
 
+from torchvision.models import resnet18
 # The standard meters that are being provided.
 from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter, ParamHistogram
 from fos import Workout
 
-
-def get_model():
-    return nn.Sequential(
-        nn.Linear(10, 32),
-        nn.ReLU(),
-        nn.Linear(32, 1))
-
 def get_workout():
-    workout = Workout(get_model(), F.mse_loss)
+    workout = Workout(Mock(), Mock())
     workout.batches = 10
     return workout
 
@@ -40,6 +32,7 @@ def test_paramhistogram():
     writer = Mock()
     loss = Mock()
     callback = ParamHistogram(writer, include_gradient=False)
-    workout = Workout(get_model(), loss, callbacks=callback)
+    model = resnet18()
+    workout = Workout(model, loss, callbacks=callback)
     callback(workout, "valid")
     assert writer.add_histogram.is_called()
