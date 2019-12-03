@@ -1,9 +1,10 @@
+# pylint: disable=E1101, C0116, C0114
 import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fos import Workout
-# pylint: disable=E1101
+
 
 def get_model():
     return nn.Sequential(
@@ -75,18 +76,6 @@ def test_trainer_state():
     os.rmdir(dir1)
     dir1 = os.path.dirname(dir1)
     os.rmdir(dir1)
-
-
-class SmartMetric():
-    def reset(self):
-        pass
-
-    def update(self, *args):
-        pass
-
-    def get(self):
-        return "mymetric", 1.
-
 
 def test_trainer_metrics():
     model = get_model()

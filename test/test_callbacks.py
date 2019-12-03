@@ -1,3 +1,4 @@
+# pylint: disable=C0116, C0114
 from unittest.mock import Mock
 import torch.nn.functional as F
 import torch.nn as nn
@@ -13,7 +14,6 @@ def get_model():
         nn.ReLU(),
         nn.Linear(32, 1))
 
-
 def get_workout():
     workout = Workout(get_model(), F.mse_loss)
     workout.batches = 10
@@ -22,7 +22,7 @@ def get_workout():
 def test_printmeter():
     meter = PrintMeter()
     workout = get_workout()
-    meter(workout, "valid")  
+    meter(workout, "valid")
 
 def test_notebookmeter():
     meter = NotebookMeter()
@@ -36,7 +36,6 @@ def _test_tensorboardmeter():
     meter(workout, "valid")
     writer.add_scalar.assert_called()
 
-
 def test_paramhistogram():
     writer = Mock()
     loss = Mock()
@@ -44,5 +43,3 @@ def test_paramhistogram():
     workout = Workout(get_model(), loss, callbacks=callback)
     callback(workout, "valid")
     assert writer.add_histogram.is_called()
-
-    

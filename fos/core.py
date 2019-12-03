@@ -30,33 +30,6 @@ class Phase(Enum):
     OTHER = 3
 
 
-class StopError(Exception):
-    '''used internally to stop the training before all the epochs have finished'''
-
-
-class SmartHistory(dict):
-    '''Stores the values of a metric. In essence it is a dictionary with the
-    key being the step when the metric was calculated and the value being the
-    outcome of that calculation.
-
-    If multiple values per step are received (like is the case with validation)
-    the moving average of the metric values are stored instead.
-
-    Args:
-        momentum: The momentum to use for the moving average (default = 0.9). The
-        calculation used is: momentum*old + (1-momentum)*new
-    '''
-
-    def __init__(self, momentum=0.9):
-        super().__init__()
-        self.momentum = momentum
-
-    def __setitem__(self, step: int, value: float):
-        if step in self:
-            value = self.momentum * self[step] + (1-self.momentum) * value
-        super().__setitem__(step, value)
-
-
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that
        reduces the amount of boilerplate code when training a model. In its the simplest form
@@ -101,6 +74,9 @@ class Workout(nn.Module):
         self.optim = optim if optim is not None else torch.optim.SGD(
             model.parameters(), lr=1e-3)
 
+    class StopError(Exception):
+        '''used internally to stop the training before all the epochs have finished'''
+
     def update_history(self, name: str, value: float) -> None:
         ''''Update the history for the passed metric name and value. It will store
             store the metric under the current step.
@@ -141,7 +117,7 @@ class Workout(nn.Module):
         '''Get all metrics that have at least one value logged'''
         return self.history.keys()
 
-    def has_metric(self, name: str, step=None) -> bool:
+    def has_metric(self, name: str, step: int = None) -> bool:
         '''Check for the metric value for the provided metric name and step.
            True of it exist, False otherwise.
         '''
@@ -150,7 +126,7 @@ class Workout(nn.Module):
         step = step if step is not None else self.step
         return step in self.history[name]
 
-    def get_metric(self, name: str, step=None):
+    def get_metric(self, name: str, step: int = None):
         '''Get the metric value for the provided metric name and step.
             If no step is provided, the last workout step is used.
         '''
@@ -233,14 +209,15 @@ class Workout(nn.Module):
 
     def stop(self) -> None:
         '''Will stop the training early. Typcially invoked by a callback when the
-        training is not progressing anymore.'''
-        raise StopError()
+           training is not progressing anymore.'''
+        raise self.StopError()
 
     def _invoke_callbacks(self, callbacks, phase) -> None:
         for callback in callbacks:
             callback(self, phase)
 
-    def fit(self, data: Iterable, valid_data: Iterable = None, epochs=1, callbacks=PrintMeter()):
+    def fit(self, data: Iterable, valid_data: Iterable = None,
+            epochs: int = 1, callbacks=PrintMeter()):
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -276,7 +253,7 @@ class Workout(nn.Module):
                 self.update_history("epoch", self.epoch)
                 self._invoke_callbacks(callbacks, "train")
 
-        except StopError:
+        except self.StopError:
             pass
 
     def save(self, filename: str = None) -> str:
@@ -360,6 +337,29 @@ def _find_latest_training(rootdir: str) -> str:
         return None
 
 
+class SmartHistory(dict):
+    '''Stores the values of a metric. In essence it is a dictionary with the
+    key being the step when the metric was calculated and the value being the
+    outcome of that calculation.
+
+    If multiple values per step are received (like is the case with validation)
+    the moving average of the metric values are stored instead.
+
+    Args:
+        momentum: The momentum to use for the moving average (default = 0.9). The
+        calculation used is: momentum*old + (1-momentum)*new
+    '''
+
+    def __init__(self, momentum=0.9):
+        super().__init__()
+        self.momentum = momentum
+
+    def __setitem__(self, step: int, value: float):
+        if step in self:
+            value = self.momentum * self[step] + (1-self.momentum) * value
+        super().__setitem__(step, value)
+
+
 class Mover():
     '''Moves tensors to a specific device. This is used to move
        the input and target tensors to the correct device like a GPU. Normally
@@ -378,7 +378,7 @@ class Mover():
            trainer  = Workout(..., mover=mover)
     '''
 
-    def __init__(self, device, non_blocking=True):
+    def __init__(self, device, non_blocking: bool = True):
         self.device = device
         self.non_blocking = non_blocking
 
