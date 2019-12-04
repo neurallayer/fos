@@ -23,7 +23,10 @@ from torch.jit import trace
 # pylint: disable=W0622
 
 class Phase(Enum):
-    '''Identifies the stage the training is in'''
+    '''Identifies the phase the training is in. The two many phases are TRAIN and VALID.
+       The value of each phase is used to prepand to the metric name to make it unique.
+    '''
+
     TRAIN = ""
     VALID = "val_"
     OTHER = "other_"

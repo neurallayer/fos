@@ -18,7 +18,7 @@ Example::
     meter = PrintMeter(exclude=["val_loss", "loss"])
  
 
-.. currentmodule:: fos.meters
+.. currentmodule:: fos.callbacks
 
 .. autoclass:: Meter
     :members:

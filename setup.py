@@ -8,7 +8,7 @@ setuptools.setup(
     name="fos",
     version=fos.__version__,
     author="FOS Authors",
-    author_email="peter@jbaron.com",
+    author_email="peter@neurallayer.com",
     description="Deeplearning framework for PyTorch",
     long_description=long_description,
     long_description_content_type="text/x-rst",

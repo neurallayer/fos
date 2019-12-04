@@ -3,15 +3,23 @@ Core
 
 .. currentmodule:: fos
 
-Supervisor
-----------
-
-.. autoclass:: Supervisor
-
-Trainer
+Workout
 -------
 
-.. autoclass:: Trainer
+.. autoclass:: Workout
+
+
+SmartHistory
+------------
+
+.. autoclass:: Phase
+    :members:
+
+
+SmartHistory
+------------
+
+.. autoclass:: SmartHistory
     :members:
 
 Mover
