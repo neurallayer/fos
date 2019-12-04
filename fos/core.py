@@ -19,7 +19,6 @@ import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 from torch.jit import trace
-from .callbacks import PrintMeter
 
 # pylint: disable=W0622
 
@@ -28,6 +27,8 @@ class Phase(Enum):
     TRAIN = ""
     VALID = "val_"
     OTHER = "other_"
+
+
 
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that
@@ -84,7 +85,7 @@ class Workout(nn.Module):
             self.history[name] = SmartHistory()
         self.history[name][self.step] = value
 
-    def get_metricname(self, name: str, phase: str) -> str:
+    def get_metricname(self, name: str, phase: Phase) -> str:
         '''Get the fully qualified name for a metric. If phase equals train the
            metric name is as specified and if phase is "valid" the metric name
            is "val_" + name.
@@ -96,9 +97,9 @@ class Workout(nn.Module):
            "val_loss": or the recorded loss during validation
         '''
         # pylint: disable= R0201
-        return name if phase == "train" else "val_" + name
+        return phase.value + name
 
-    def _update_metrics(self, loss, pred, target, phase: str) -> None:
+    def _update_metrics(self, loss, pred, target, phase: Phase) -> None:
         '''Invoke the configured metrics functions and return the result
 
            Args:
@@ -185,7 +186,7 @@ class Workout(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(minibatch)
             loss, pred = self(input, target)
-            self._update_metrics(loss, pred, target, "valid")
+            self._update_metrics(loss, pred, target, Phase.VALID)
 
     def update(self, *minibatch) -> None:
         '''Perform a single learning step. This method is normally invoked by
@@ -204,7 +205,7 @@ class Workout(nn.Module):
             loss.backward()
             self.optim.step()
             self.step += 1
-            self._update_metrics(loss, pred, target, "train")
+            self._update_metrics(loss, pred, target, Phase.TRAIN)
             self.optim.zero_grad()
 
     def stop(self) -> None:
@@ -217,7 +218,7 @@ class Workout(nn.Module):
             callback(self, phase)
 
     def fit(self, data: Iterable, valid_data: Iterable = None,
-            epochs: int = 1, callbacks=PrintMeter()) -> None:
+            epochs: int = 1, callbacks=None) -> None:
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -233,6 +234,11 @@ class Workout(nn.Module):
                print an update at the end of each epoch and ignore the other updates. This can
                be a single callback or a list of callbacks.
         '''
+        if callbacks is None:
+            # pylint: disable=C0415, R0401
+            from .callbacks import PrintMeter
+            callbacks = PrintMeter()
+
         callbacks = callbacks if isinstance(callbacks, (list, tuple)) else [callbacks]
 
         try:
@@ -244,14 +250,14 @@ class Workout(nn.Module):
 
                 for minibatch in data:
                     self.update(*minibatch)
-                    self._invoke_callbacks(callbacks, "train")
+                    self._invoke_callbacks(callbacks, Phase.TRAIN)
 
                 if valid_data is not None:
                     for minibatch in valid_data:
                         self.validate(*minibatch)
 
                 self.update_history("epoch", self.epoch)
-                self._invoke_callbacks(callbacks, "train")
+                self._invoke_callbacks(callbacks, Phase.VALID)
 
         except self.StopError:
             pass

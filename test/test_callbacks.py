@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from torchvision.models import resnet18
 # The standard meters that are being provided.
 from fos.callbacks import PrintMeter, NotebookMeter, TensorBoardMeter, ParamHistogram
-from fos import Workout
+from fos import Workout, Phase
 
 def get_workout():
     workout = Workout(Mock(), Mock(), optim=Mock(), mover=Mock())
@@ -14,18 +14,18 @@ def get_workout():
 def test_printmeter():
     meter = PrintMeter()
     workout = get_workout()
-    meter(workout, "valid")
+    meter(workout, Phase.VALID)
 
 def test_notebookmeter():
     meter = NotebookMeter()
     workout = get_workout()
-    meter(workout, "valid")
+    meter(workout, Phase.VALID)
 
 def _test_tensorboardmeter():
     writer = Mock()
     workout = get_workout()
     meter = TensorBoardMeter(writer=writer)
-    meter(workout, "valid")
+    meter(workout, Phase.VALID)
     writer.add_scalar.assert_called()
 
 def test_paramhistogram():
@@ -34,5 +34,5 @@ def test_paramhistogram():
     callback = ParamHistogram(writer, include_gradient=False)
     model = resnet18()
     workout = Workout(model, loss, callbacks=callback)
-    callback(workout, "valid")
+    callback(workout, Phase.VALID)
     assert writer.add_histogram.is_called()
