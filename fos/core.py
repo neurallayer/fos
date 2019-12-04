@@ -25,10 +25,9 @@ from .callbacks import PrintMeter
 
 class Phase(Enum):
     '''Identifies the stage the training is in'''
-    TRAIN = 1
-    VALID = 2
-    OTHER = 3
-
+    TRAIN = ""
+    VALID = "val_"
+    OTHER = "other_"
 
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that

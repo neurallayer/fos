@@ -15,7 +15,7 @@ MNIST
 A convolutional network that is trained on the MNIST (handwritten digits) dataset. 
 It also shows how to use multiple meters, visualize some metrics and save and restore 
 a training session.
- 
+
 
 Tensorboard
 -----------
