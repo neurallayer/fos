@@ -65,12 +65,10 @@ class SingleClassAccuracy(Metric):
         result = (y == arg_maxs).float().mean()
         return result.item()
 
-
 def _get_metrics(workout, metric):
     keys = list(workout.history[metric].keys())
     keys.sort()
     return keys, [workout.history[metric][k] for k in keys]
-
 
 def plot_metrics(plt, workout, metrics):
     '''Plot metrics collected during training'''
@@ -83,10 +81,9 @@ def plot_metrics(plt, workout, metrics):
     plt.legend(metrics)
     return plt.show()
 
-
-
 def _get_sum(tensor: Tensor) -> float:
     return tensor.float().sum(dim=0).mean().item()
+
 
 class ConfusionMetric(Metric):
     '''Calculate the TP, FP, TN and FN for the predicted classes.
