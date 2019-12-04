@@ -122,3 +122,4 @@ dmypy.json
 MNIST
 .vscode
 scrap/
+runs/
