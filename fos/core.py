@@ -3,7 +3,7 @@ The core module contains the basic functionality required to train a model.
 
 There are 3 classes in the core package:
 
-1) Workout, that enables trainign a model with just a few lines of code
+1) Workout, that enables training a model with just a few lines of code
 2) Mover, that will move tensors to the desired device like a GPU
 3) SmartHistory, that will store the captured metrics
 
