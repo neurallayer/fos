@@ -33,6 +33,6 @@ def test_paramhistogram():
     loss = Mock()
     callback = ParamHistogram(writer, include_gradient=False)
     model = resnet18()
-    workout = Workout(model, loss, callbacks=callback)
+    workout = Workout(model, loss, callbacks=[callback])
     callback(workout, Phase.VALID)
     assert writer.add_histogram.is_called()

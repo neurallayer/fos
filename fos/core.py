@@ -216,12 +216,12 @@ class Workout(nn.Module):
            training is not progressing anymore.'''
         raise self.StopError()
 
-    def _invoke_callbacks(self, callbacks, phase) -> None:
+    def _invoke_callbacks(self, callbacks: [Callable], phase: Phase) -> None:
         for callback in callbacks:
             callback(self, phase)
 
     def fit(self, data: Iterable, valid_data: Iterable = None,
-            epochs: int = 1, callbacks=None) -> None:
+            epochs: int = 1, callbacks: [Callable] = None) -> None:
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
@@ -234,15 +234,12 @@ class Workout(nn.Module):
                default = 1
                callbacks: the callbacks to use. These are invoked at the end of an update
                and the end of the validation. The default is the PrintMeter that will
-               print an update at the end of each epoch and ignore the other updates. This can
-               be a single callback or a list of callbacks.
+               print an update at the end of each epoch and ignore the other updates.
         '''
         if callbacks is None:
             # pylint: disable=C0415, R0401
             from .callbacks import PrintMeter
-            callbacks = PrintMeter()
-
-        callbacks = callbacks if isinstance(callbacks, (list, tuple)) else [callbacks]
+            callbacks = [PrintMeter()]
 
         try:
 
