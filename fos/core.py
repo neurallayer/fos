@@ -81,8 +81,8 @@ class Workout(nn.Module):
         '''used internally to stop the training before all the epochs have finished'''
 
     def update_history(self, name: str, value: float) -> None:
-        ''''Update the history for the passed metric name and value. It will store
-            store the metric under the current step.
+        ''''Update the history for the passed metric name and its value. It will store
+            the metric under the current step.
         '''
         if name not in self.history:
             self.history[name] = SmartHistory()
@@ -102,8 +102,8 @@ class Workout(nn.Module):
         # pylint: disable= R0201
         return phase.value + name
 
-    def _update_metrics(self, loss, pred, target, phase: Phase) -> None:
-        '''Invoke the configured metrics functions and return the result
+    def _invoke_metrics(self, loss, pred, target, phase: Phase) -> None:
+        '''Run the configured metrics functions and update the history with theirs results.
 
            Args:
                loss (scaler): the loss value
@@ -189,7 +189,7 @@ class Workout(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(minibatch)
             loss, pred = self(input, target)
-            self._update_metrics(loss, pred, target, Phase.VALID)
+            self._invoke_metrics(loss, pred, target, Phase.VALID)
 
     def update(self, *minibatch) -> None:
         '''Perform a single learning step. This method is normally invoked by
@@ -208,7 +208,7 @@ class Workout(nn.Module):
             loss.backward()
             self.optim.step()
             self.step += 1
-            self._update_metrics(loss, pred, target, Phase.TRAIN)
+            self._invoke_metrics(loss, pred, target, Phase.TRAIN)
             self.optim.zero_grad()
 
     def stop(self) -> None:
