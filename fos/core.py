@@ -111,10 +111,12 @@ class Workout(nn.Module):
                target (Tensor): the target value
         '''
         loss_name = self.get_metricname("loss", phase)
-        self.update_history(loss_name, loss.item())
+        self.update_history(loss_name, loss.detach())
         for name, func in self.metrics.items():
             value = func(pred, target)
             fqname = self.get_metricname(name, phase)
+            if hasattr(value, "detach"):
+                value = value.detach()
             self.update_history(fqname, value)
 
     def get_metrics(self) -> List[str]:
@@ -343,6 +345,7 @@ def _find_latest_training(rootdir: str) -> str:
         return None
 
 
+
 class SmartHistory(dict):
     '''Stores the values of a metric. In essence it is a dictionary with the
     key being the step when the metric was calculated and the value being the
@@ -352,20 +355,64 @@ class SmartHistory(dict):
     the moving average of the metric values are stored instead. So at every step
     there is only a single value per metric.
 
+    Finally it will delay calling `value.item` by putting received values on a
+    backlog. This will typically result in less blocking behavior.
+
     Args:
         momentum: The momentum to use for the moving average (default = 0.9). The
         calculation used is: momentum*old + (1-momentum)*new
     '''
 
-    def __init__(self, momentum=0.9):
+    def __init__(self, momentum=0.9, max_backlog=10):
         super().__init__()
         self.momentum = momentum
+        self._backlog = []
+        self.max_backlog = max_backlog
 
-    def __setitem__(self, step: int, value: float):
-        if step in self:
-            value = self.momentum * self[step] + (1-self.momentum) * value
-        super().__setitem__(step, value)
+    def _process_backlog(self):
+        for step, value in self._backlog:
+            if hasattr(value, "item"):
+                value = value.item()
+            if super().__contains__(step):
+                old_value = super().__getitem__(step)
+                value = self.momentum * old_value + (1-self.momentum) * value
+            super().__setitem__(step, value)
+        self._backlog = []
 
+    def __setitem__(self, step: int, value):
+        self._backlog.append((step, value))
+        if len(self._backlog) > self.max_backlog:
+            self._process_backlog()
+
+    def __getitem__(self, step: int):
+        if self._backlog:
+            self._process_backlog()
+        return super().__getitem__(step)
+
+    def __contains__(self, step: int):
+        if self._backlog:
+            self._process_backlog()
+        return super().__contains__(step)
+
+    
+    def __getstate__(self):
+        if self._backlog:
+            self._process_backlog()
+        
+        return {
+            "momentum" : self.momentum,
+            "max_backlog": self.max_backlog,
+            "dict" : dict(super().items()) 
+        }
+    
+    def __setstate__(self, state):
+            self._backlog = []
+            self.momentum = state["momentum"]
+            self.max_backlog: state["max_backlog"]
+            for item in state["dict"].items():
+                super().__setitem__(*item)
+            
+    
 
 class Mover():
     '''Moves tensors to a specific device. This is used to move

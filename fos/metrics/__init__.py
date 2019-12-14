@@ -63,7 +63,7 @@ class SingleClassAccuracy(Metric):
 
         (_, arg_maxs) = yp.max(dim=1)
         result = (y == arg_maxs).float().mean()
-        return result.item()
+        return result
 
 def _get_metrics(workout, metric):
     keys = list(workout.history[metric].keys())
@@ -82,7 +82,7 @@ def plot_metrics(plt, workout, metrics):
     return plt.show()
 
 def _get_sum(tensor: Tensor) -> float:
-    return tensor.float().sum(dim=0).mean().item()
+    return tensor.float().sum(dim=0).mean()
 
 
 class ConfusionMetric(Metric):

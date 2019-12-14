@@ -152,20 +152,20 @@ class PrintMeter(Callback):
 
     def __init__(self, metrics: Metrics = None):
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
-        self.metric_format = " - {} : {:.6f} "
+        self.metric_format = " - {}: {:.4f}"
 
     def _format(self, key, value):
         try:
             value = float(value)
             result = self.metric_format.format(key, value)
         except ValueError:
-            result = " - {} : {} ".format(key, value)
+            result = " - {}: {}".format(key, value)
         return result
 
     def __call__(self, workout: Workout, phase: Phase):
         if phase != Phase.VALID:
             return
-        result = "{:6}:{:6}".format(workout.epoch, workout.step)
+        result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
             if workout.has_metric(metric):
                 result += self._format(metric, workout.get_metric(metric))
@@ -186,7 +186,7 @@ class NotebookMeter(Callback):
         self.epoch = -1
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
-        self.metric_format = " - {} : {:.5f} "
+        self.metric_format = " - {}: {:.4f}"
 
     def _get_tqdm(self, workout):
         if self.tqdm is None:
@@ -201,7 +201,7 @@ class NotebookMeter(Callback):
             value = float(value)
             result = self.metric_format.format(key, value)
         except ValueError:
-            result = "{}={} ".format(key, value)
+            result = " - {}: {}".format(key, value)
         return result
 
     def _new_meter(self, workout):
@@ -217,7 +217,7 @@ class NotebookMeter(Callback):
 
         # progress = (workout.step - self.last)/workout.batches
 
-        result = "[{:3}:{:6}] ".format(workout.epoch, workout.step)
+        result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
             if workout.has_metric(metric):
                 result += self._format(metric, workout.get_metric(metric))
