@@ -6,7 +6,7 @@ from abc import abstractmethod
 from typing import List
 from collections import OrderedDict
 from tqdm import tqdm
-from fos import Workout, Phase
+from fos import Workout, Mode
 # pylint: disable=R0903
 
 Metrics = List[str]
@@ -36,12 +36,12 @@ class Callback():
     '''
 
     @abstractmethod
-    def __call__(self, workout: Workout, phase: Phase) ->None:
+    def __call__(self, workout: Workout, mode: Mode) ->None:
         '''update the state of the meter with a certain metric and its value.
 
            Args:
                workout: the workout
-               phase: the phase ("trian" or "valid")
+               mode: the mode (mode.TRAIN or mode.EVAL)
         '''
 
 
@@ -55,8 +55,8 @@ class EarlyStop(Callback):
         self.minimize = minimize
         self.value = float('Inf') if minimize else -float('Inf')
 
-    def __call__(self, workout: Workout, phase: Phase):
-        if phase != Phase.VALID:
+    def __call__(self, workout: Workout, mode: Mode):
+        if mode != mode.EVAL:
             return
 
         value = workout.get_metric(self.metric)
@@ -80,8 +80,8 @@ class AutoSave(Callback):
         self.value = float('Inf') if minimize else -float('Inf')
         self.filename = filename
 
-    def __call__(self, workout: Workout, phase: Phase):
-        if phase != Phase.VALID:
+    def __call__(self, workout: Workout, mode: Mode):
+        if mode != mode.EVAL:
             return
 
         value = workout.get_metric(self.metric)
@@ -108,7 +108,7 @@ class RegisterLR(Callback):
     def __init__(self, prefix: str = "lr_"):
         self.prefix = prefix
 
-    def __call__(self, workout: Workout, phase: Phase):
+    def __call__(self, workout: Workout, mode: Mode):
         for idx, group in enumerate(workout.optim.param_groups):
             name = self.prefix + idx
             value = group["lr"]
@@ -122,8 +122,8 @@ class EpochSave(Callback):
     def __init__(self, filename: str = None):
         self.filename = filename
 
-    def __call__(self, workout: Workout, phase: Phase):
-        if phase != Phase.VALID:
+    def __call__(self, workout: Workout, mode: Mode):
+        if mode != mode.EVAL:
             return
         workout.save(self.filename)
 
@@ -131,7 +131,7 @@ class EpochSave(Callback):
 class SilentMeter(Callback):
     '''Silently ignore all the metrics and don't produce any output'''
 
-    def __call__(self, workout: Workout, phase: Phase):
+    def __call__(self, workout: Workout, mode: Mode):
         pass
 
 
@@ -162,8 +162,8 @@ class PrintMeter(Callback):
             result = " - {}: {}".format(key, value)
         return result
 
-    def __call__(self, workout: Workout, phase: Phase):
-        if phase != Phase.VALID:
+    def __call__(self, workout: Workout, mode: Mode):
+        if mode != mode.EVAL:
             return
         result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
@@ -211,7 +211,7 @@ class NotebookMeter(Callback):
             self.tqdm.close()
             self.tqdm = None
 
-    def __call__(self, workout: Workout, phase: Phase):
+    def __call__(self, workout: Workout, mode: Mode):
         if workout.epoch > self.epoch:
             self._new_meter(workout)
 
@@ -269,7 +269,7 @@ class TensorBoardMeter(Callback):
         '''Set the writer to use for logging the metrics'''
         self.writer = writer
 
-    def __call__(self, workout: Workout, phase: Phase):
+    def __call__(self, workout: Workout, mode: Mode):
         for metric in self.metrics:
             if workout.has_metric(metric):
                 value = workout.get_metric(metric)
@@ -327,7 +327,7 @@ class ParamHistogram(Callback):
     def _get_np(param):
         return param.clone().detach().cpu().numpy()
 
-    def __call__(self, workout: Workout, phase: Phase):
+    def __call__(self, workout: Workout, mode: Mode):
 
         model = workout.model
 

@@ -23,13 +23,13 @@ from torch.jit import trace
 
 # pylint: disable=W0622
 
-class Phase(Enum):
+class Mode(Enum):
     '''Identifies the phase the training is in. The two many phases are TRAIN and VALID.
        The value of each phase is used to prepand to the metric name to make it unique.
     '''
 
     TRAIN = ""
-    VALID = "val_"
+    EVAL = "val_"
     OTHER = "other_"
 
 
@@ -89,7 +89,7 @@ class Workout(nn.Module):
             self.history[name] = SmartHistory()
         self.history[name][self.step] = value
 
-    def get_metricname(self, name: str, phase: Phase) -> str:
+    def get_metricname(self, name: str, phase: Mode) -> str:
         '''Get the fully qualified name for a metric. If phase equals train the
            metric name is as specified and if phase is "valid" the metric name
            is "val_" + name.
@@ -103,7 +103,7 @@ class Workout(nn.Module):
         # pylint: disable= R0201
         return phase.value + name
 
-    def _invoke_metrics(self, loss, pred, target, phase: Phase) -> None:
+    def _invoke_metrics(self, loss, pred, target, phase: Mode) -> None:
         '''Run the configured metrics functions and update the history with theirs results.
 
            Args:
@@ -192,7 +192,7 @@ class Workout(nn.Module):
         with torch.set_grad_enabled(False):
             input, target = self.mover(minibatch)
             loss, pred = self(input, target)
-            self._invoke_metrics(loss, pred, target, Phase.VALID)
+            self._invoke_metrics(loss, pred, target, Mode.EVAL)
 
     def update(self, *minibatch) -> None:
         '''Perform a single learning step. This method is normally invoked by
@@ -211,7 +211,7 @@ class Workout(nn.Module):
             loss.backward()
             self.optim.step()
             self.step += 1
-            self._invoke_metrics(loss, pred, target, Phase.TRAIN)
+            self._invoke_metrics(loss, pred, target, Mode.TRAIN)
             self.optim.zero_grad()
 
     def stop(self) -> None:
@@ -219,7 +219,7 @@ class Workout(nn.Module):
            training is not progressing anymore.'''
         raise self.StopError()
 
-    def _invoke_callbacks(self, callbacks: [Callable], phase: Phase) -> None:
+    def _invoke_callbacks(self, callbacks: [Callable], phase: Mode) -> None:
         for callback in callbacks:
             callback(self, phase)
 
@@ -253,14 +253,14 @@ class Workout(nn.Module):
 
                 for minibatch in data:
                     self.update(*minibatch)
-                    self._invoke_callbacks(callbacks, Phase.TRAIN)
+                    self._invoke_callbacks(callbacks, Mode.TRAIN)
 
                 if valid_data is not None:
                     for minibatch in valid_data:
                         self.validate(*minibatch)
 
                 self.update_history("epoch", self.epoch)
-                self._invoke_callbacks(callbacks, Phase.VALID)
+                self._invoke_callbacks(callbacks, Mode.EVAL)
 
         except self.StopError:
             pass
