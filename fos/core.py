@@ -13,6 +13,7 @@ import time
 import os
 import logging
 from enum import Enum
+from collections import UserDict
 from typing import Callable, Iterable, Tuple, List
 import numpy as np
 import torch
@@ -346,7 +347,7 @@ def _find_latest_training(rootdir: str) -> str:
 
 
 
-class SmartHistory(dict):
+class SmartHistory(UserDict):
     '''Stores the values of a metric. In essence it is a dictionary with the
     key being the step when the metric was calculated and the value being the
     outcome of that calculation.
@@ -394,25 +395,6 @@ class SmartHistory(dict):
             self._process_backlog()
         return super().__contains__(step)
 
-    
-    def __getstate__(self):
-        if self._backlog:
-            self._process_backlog()
-        
-        return {
-            "momentum" : self.momentum,
-            "max_backlog": self.max_backlog,
-            "dict" : dict(super().items()) 
-        }
-    
-    def __setstate__(self, state):
-            self._backlog = []
-            self.momentum = state["momentum"]
-            self.max_backlog: state["max_backlog"]
-            for item in state["dict"].items():
-                super().__setitem__(*item)
-            
-    
 
 class Mover():
     '''Moves tensors to a specific device. This is used to move

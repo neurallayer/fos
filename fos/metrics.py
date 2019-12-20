@@ -1,5 +1,6 @@
 '''
 This module contains the various metrics that can used to monitor the progress during training.
+Any loss function can be used as a metric, however not every metric is a valid loss function.
 '''
 import math
 from abc import abstractmethod
