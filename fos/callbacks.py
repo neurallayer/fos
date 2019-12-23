@@ -2,9 +2,9 @@
 of functionality
 '''
 import logging
+import time
 from abc import abstractmethod
 from typing import List
-from collections import OrderedDict
 from tqdm import tqdm
 from fos import Workout, Mode
 # pylint: disable=R0903
@@ -137,10 +137,10 @@ class SilentMeter(Callback):
 
 class PrintMeter(Callback):
     '''Displays the metrics by using a simple print
-       statement the end of an epoch
+       statement the end of an epoch.
 
        If you use this in a shell script, please be aware that
-       by default Python buffers the output. You can change this
+       by default Python might buffer the output. You can change this
        behaviour by using the `-u` option. See also:
 
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
@@ -153,6 +153,8 @@ class PrintMeter(Callback):
     def __init__(self, metrics: Metrics = None):
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.metric_format = " - {}: {:.4f}"
+        self.epoch = -1
+        self.start_time = time.time()
 
     def _format(self, key, value):
         try:
@@ -163,21 +165,25 @@ class PrintMeter(Callback):
         return result
 
     def __call__(self, workout: Workout, mode: Mode):
-        if mode != mode.EVAL:
+        if workout.epoch > self.epoch:
+            self.start_time = time.time()
+            self.epoch = workout.epoch
+
+        if mode == mode.TRAIN:
             return
+
         result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
             if workout.has_metric(metric):
                 result += self._format(metric, workout.get_metric(metric))
+        result += " - time: {:.1f}s".format(time.time()-self.start_time)
         print(result)
-
-
 
 
 
 class NotebookMeter(Callback):
     '''Meter that displays the metrics and progress in
-       a Jupyter notebook. This meter uses tqdm to display
+       a Jupyter notebook. This meter relies on tqdm to display
        the progress bar.
     '''
 
@@ -187,13 +193,17 @@ class NotebookMeter(Callback):
         self.metrics = metrics if metrics is not None else ["loss", "acc", "val_loss", "val_acc"]
         self.bar_format = "{l_bar}{bar}|{elapsed}<{remaining}"
         self.metric_format = " - {}: {:.4f}"
+        self.last_batches = None
 
     def _get_tqdm(self, workout):
         if self.tqdm is None:
             self.tqdm = tqdm(
-                total=workout.batches+1,
+                total=workout.batches+1 if workout.batches is not None else self.last_batches,
                 mininterval=1,
                 bar_format=self.bar_format)
+            self.last_batches = 0
+
+        self.last_batches += 1
         return self.tqdm
 
     def _format(self, key, value):
@@ -205,17 +215,15 @@ class NotebookMeter(Callback):
         return result
 
     def _new_meter(self, workout):
-        # self.last = workout.step - 1
         self.epoch = workout.epoch
         if self.tqdm is not None:
             self.tqdm.close()
             self.tqdm = None
 
     def __call__(self, workout: Workout, mode: Mode):
+
         if workout.epoch > self.epoch:
             self._new_meter(workout)
-
-        # progress = (workout.step - self.last)/workout.batches
 
         result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
@@ -224,8 +232,10 @@ class NotebookMeter(Callback):
 
         progressbar = self._get_tqdm(workout)
         progressbar.update(1)
-        # pb.set_description(result, refresh=False)
-        progressbar.set_description(result)
+        if mode != mode.EVAL:
+            progressbar.set_description(result, refresh=False)
+        else:
+            progressbar.set_description(result)
 
 
 class TensorBoardMeter(Callback):
