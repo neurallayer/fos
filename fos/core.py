@@ -24,7 +24,7 @@ from torch.jit import trace
 # pylint: disable=W0622
 
 class Mode(Enum):
-    '''Identifies the phase the training is in. The two many phases are TRAIN and VALID.
+    '''Identifies the phase the training is in. The two many phases are TRAIN and EVAL.
        The value of each phase is used to prepand to the metric name to make it unique.
     '''
 
@@ -235,7 +235,7 @@ class Workout(nn.Module):
                epochs (int): the number of epochs to run the training for,
                default = 1
                callbacks: the callbacks to use. These are invoked at the end of an update
-               and the end of the validation. The default is the PrintMeter that will
+               and the end of the validation. The default is the `PrintMeter` that will
                print an update at the end of each epoch and ignore the other updates.
         '''
         if callbacks is None:

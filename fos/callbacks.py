@@ -137,7 +137,7 @@ class SilentMeter(Callback):
 
 class PrintMeter(Callback):
     '''Displays the metrics by using a simple print
-       statement the end of an epoch.
+       statement at the end of an epoch.
 
        If you use this in a shell script, please be aware that
        by default Python might buffer the output. You can change this
@@ -195,7 +195,7 @@ class NotebookMeter(Callback):
         self.metric_format = " - {}: {:.4f}"
         self.last_batches = None
 
-    def _get_tqdm(self, workout):
+    def _get_meter(self, workout):
         if self.tqdm is None:
             self.tqdm = tqdm(
                 total=workout.batches+1 if workout.batches is not None else self.last_batches,
@@ -214,7 +214,7 @@ class NotebookMeter(Callback):
             result = " - {}: {}".format(key, value)
         return result
 
-    def _new_meter(self, workout):
+    def _close_meter(self, workout):
         self.epoch = workout.epoch
         if self.tqdm is not None:
             self.tqdm.close()
@@ -223,19 +223,20 @@ class NotebookMeter(Callback):
     def __call__(self, workout: Workout, mode: Mode):
 
         if workout.epoch > self.epoch:
-            self._new_meter(workout)
+            self._close_meter(workout)
 
         result = "[{:3}:{:6}]".format(workout.epoch, workout.step)
         for metric in self.metrics:
             if workout.has_metric(metric):
                 result += self._format(metric, workout.get_metric(metric))
 
-        progressbar = self._get_tqdm(workout)
+        progressbar = self._get_meter(workout)
         progressbar.update(1)
         if mode != mode.EVAL:
             progressbar.set_description(result, refresh=False)
         else:
             progressbar.set_description(result)
+            self._close_meter(workout)
 
 
 class TensorBoardMeter(Callback):
