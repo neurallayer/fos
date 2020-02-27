@@ -38,16 +38,12 @@ Then create the FOS objects that will take care of the training and output::
 
 And we are ready to start the training::
 
-   trainer.fit(train_data, valid_data, epochs=5)
+   workout.fit(train_data, valid_data, epochs=5)
 
 
 Examples
 ========
-You can find several example Jupyter notebooks `here <https://github.com/innerlogic/fos/examples>`_, 
-or even more convenient try them directly in a Google Colab environment:
-
-    1) Basic Example
-    2) MNIST example
+You can find several example Jupyter notebooks `here <https://github.com/neurallayer/fos/examples>`_ 
 
 
 Contribution

@@ -9,7 +9,7 @@ Typically they will fall into one of the following two categories:
       Once we agree that the plan looks good, go ahead and implement it.
     
 2. You found a bug and want to fix it.
-    - Look at the outstanding issues here: `<https://github.com/innerlogic/fos/issues>`_
+    - Look at the outstanding issues here: `<https://github.com/neurallayer/fos/issues>`_
     - If the bug is not mentioned yet, please raise a new issue.
     - Once confirmed, you can implement the bug-fix.
     
