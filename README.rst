@@ -43,12 +43,12 @@ And we are ready to start the training::
 
 Examples
 ========
-You can find several example Jupyter notebooks `here <https://github.com/neurallayer/fos/examples>`_ 
+You can find several example Jupyter notebooks `here <https://github.com/neurallayer/fos/tree/master/examples>`_ 
 
 
 Contribution
 ============
 If you want to help out, we appreciate all contributions. 
-Please see the [contribution guidelines]() for more information.
+Please see the contribution guidelines for more information.
 
 As always, PRs are welcome :)= 
