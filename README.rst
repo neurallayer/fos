@@ -25,15 +25,15 @@ Fos requires Python 3.5 or higher.
 Usage
 =====
 Training a model, requires just a few lines of code. First create the model, 
-optimizer and loss function that you want to use, creating plain PyTorch objects::
+optimizer and loss function that you want to use, using normal PyTorch code::
 
-   net   = resnet18()
-   optim = Adam(predictor.parameters())
-   loss  = F.binary_cross_entropy_with_logits
+   net = resnet18()
+   optim = Adam(net.parameters())
+   loss = F.binary_cross_entropy_with_logits
 
-Then create the FOS objects that will take care of the training and output::
+Then create the FOS workout that will take care of the training and output::
 
-   workout   = Workout(predictor, loss, optim)
+   workout = Workout(net, loss, optim)
   
 
 And we are ready to start the training::
