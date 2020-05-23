@@ -36,7 +36,13 @@ Google Colab
 You can run the above notebook on your own computer once you have installed Fos. They should
 run fine, even if you don't have a GPU in your machine.
 
-But it is also possible to run them on Google Colaboratory without having to install anything. 
-These are the links to the Google Colab notebooks:
+But it is also possible to run them on Google Colaboratory without having to install anything. Just
+go to https://colab.research.google.com/ and select upload from github.
+
+If you enter for `neurallayer` you can select the fos repository and automaticly the notebooks will appear
+so they can be selected amd run. 
+
+Make sure you uncomment the line that will install fos first.
+
 
 
