@@ -1,3 +1,4 @@
+setuptools
 torch
 torchvision
 tqdm
