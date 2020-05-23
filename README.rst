@@ -1,3 +1,7 @@
+.. image:: https://travis-ci.com/neurallayer/fos.svg?branch=master
+    :target: https://travis-ci.com/neurallayer/fos
+
+
 Introduction
 ============
 **FOS** is a Python framework that makes it easy to develop neural network models 
