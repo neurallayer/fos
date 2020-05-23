@@ -46,27 +46,26 @@ Quick Start
         import torch.nn.functional as F
         from torchvision.models import resnet18 
 
-        from fos import Supervisor, Trainer
+        from fos import Workout
         from fos.meters import NotebookMeter
 
-    Then we create the model we want to train, an optimizer and the loss function::
+    Then we create the model we want to train, and the loss function::
 
-       predictor = resnet18()
-       optim     = torch.optim.Adam(predictor.parameters())
-       loss      = F.binary_cross_entropy_with_logits
+       net   = resnet18()
+       loss  = F.binary_cross_entropy_with_logits
 
     Finally we create the supervised model, a meter and the trainer::
 
-       model   = Supervisor(predictor, loss)
-       meter   = NotebookMeter()
-       trainer = Trainer(model, optim, meter)
+       workout   = Workout(net, loss)
+       meter     = NotebookMeter()
+       
 
     And we are ready to start the training. We create some dummy data in this example that emulates 
     the input images and target values. Typically this would be a dataloader in a real scenario. 
     And then we can run the trainer::
 
        dummy_data = [(torch.randn(4,3,224,224), torch.rand(4,1000).round()) for i in range(10)]
-       trainer.run(dummy_data, epochs=5)
+       workout.fit(dummy_data, epochs=5, callbacks = [meter])
 
     So only a few lines of code are required to get started. And the above if a fully
     working example, no steps skipped. The following section gives an highlevel overview of the FOS 
@@ -77,73 +76,32 @@ Quick Start
 Components
 ==========
 
-Supervisor
-----------
-Supervisor is a model that adds a loss function to the model that you want to train.
-So you create an instance by providing both the model you want to train (we refer to this as the predictor) 
-and the loss function::
-
-    model = Supervisor(predictor, loss_fn)
-
-Under the hood, the forward of the supervisor looks something like this::
-
-    def forward(self, x, target):
-        y_pred = predictor(x)
-        loss   = loss_fn(y_pred, target)
-        return loss
-
-The Supervisor also has additional methods to train and validate a batch and is used by the Trainer to train the model.
-It is the Supervisor responsibility to perform both the forward and backward step. And the Supervisor optionally invokes the additional metrics to get more insights how the model is performing. However it is the trainer that updates 
-the model by invoking `optimizer.step`.
-
-The provided Supervisor implementation can handle most scenarios, but you can alway extend it to 
-cather for specific use cases.
-
-
-Trainer
+Workout
 -------
-The trainer is the coponent that glues all other components together and responsible for running the training epochs. 
-The trainer contains the loops that go over the provided data (trainer.run). 
+Workout is the central component that adds a loss function and optimizer to the model that you want to train.
+So you create an instance by providing the model you want to train, the loss function, the optimizer and metrics::
 
-To initiate a trainer you need to provide at least a supervisor, optimizer and meter::
+    workout = Workout(model, loss_fn, optim, acc=metric1, someother=metric2)
 
-    trainer = Trainer(model, optimizer, meter)
-    
-And then to train for a number of epochs you need to provide the data::
 
-    trainer.run(data, validation_data, epochs=10)
+Training
+--------
+After you created the workout, the training can start::
 
-The diagram below shows how the components are linked to each other.
-
-.. image:: /_static/img/logical_components.png
+    trainer.run(data, validation_data, epochs=10, callbacks=[NotebookMeter()])
 
 
 Metric
 ------
-A metric is nothing more then a plain Python function that can be added to a Supervisor or a Trainer to get extra insights into
-the performance of your model. There are two types of metrics support:
-
-1) Metrics that evaluate the prediction vs target values. These can be passed as an argument when you create a Supervisor. 
-2) metrics that evaluate the model itself. These can be passed as an argument when you create a Trainer.
-
-Metrics are optional and if you don't provide any, only the loss value will be added as a metric.
-
-Meter
------
-A meter captures the generated metrics and displays them by for example printing results in a Jupyter Notebook or 
-logging them to a file. Whenever the trainer is done with a training step, it will retrieve the generated metrics and hand them
-over to the meter (meter.update).
+A metric is nothing more then a plain Python function that can be added to a Workout to get extra insights into
+the performance of your model. Metrics are optional and if you don't provide any, only the loss value will be added as a metric.
 
 
-Read more about meters (and calcuators) at meters.rst
-
-
-
-Flow
-====
-The following diagram shows the interactin between the various components when you invoke ``trainer.run``:
-
-.. image:: /_static/img/logical_flow.png
+Callback
+--------
+A callback captures the generated metrics and displays them by for example printing results in a Jupyter Notebook or 
+logging them to a file. Whenever the training is done with a training step, it will retrieve the generated metrics and hand them
+over to the meter. Read more about meters at callbacks.rst
 
 
 Inspiration
