@@ -123,3 +123,4 @@ MNIST
 .vscode
 scrap/
 runs/
+examples/*.pty

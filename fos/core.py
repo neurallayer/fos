@@ -35,7 +35,7 @@ class Mode(Enum):
 
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that
-       reduces the amount of boilerplate code when training a model. In its the simplest form
+       reduces the amount of boilerplate code required when training a model. In its the simplest form
        it can be used as follows:
 
        .. code-block:: python
@@ -345,8 +345,8 @@ def _find_latest_training(rootdir: str) -> str:
         return None
 
 
-
-class SmartHistory(UserDict):
+# pylint: disable=too-many-ancestors
+class SmartHistory(UserDict): 
     '''Stores the values of a metric. In essence it is a dictionary with the
     key being the step when the metric was calculated and the value being the
     outcome of that calculation.

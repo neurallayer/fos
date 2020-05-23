@@ -1,5 +1,5 @@
 '''Contains various callbacks that can be used during training to add a wide variety
-of functionality
+of functionality to th training loop.
 '''
 import logging
 import time
@@ -141,7 +141,7 @@ class PrintMeter(Callback):
 
        If you use this in a shell script, please be aware that
        by default Python might buffer the output. You can change this
-       behaviour by using the `-u` option. See also:
+       behaviour by adding the `-u` option to the python command. See also:
 
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
 
@@ -184,7 +184,7 @@ class PrintMeter(Callback):
 class NotebookMeter(Callback):
     '''Meter that displays the metrics and progress in
        a Jupyter notebook. This meter relies on tqdm to display
-       the progress bar.
+       a progress bar.
     '''
 
     def __init__(self, metrics: Metrics = None):

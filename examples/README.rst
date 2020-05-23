@@ -34,9 +34,9 @@ Explains how to use Fos in combination with models that expect multiple input an
 Google Colab
 ============
 You can run the above notebook on your own computer once you have installed Fos. They should
-run fine, even if you don't have a GPU.
+run fine, even if you don't have a GPU in your machine.
 
-But it is also possible to run them on Google Colab (Colaboratorium) without 
-having to install anything. These are the links to the Google Colab notebooks:
+But it is also possible to run them on Google Colaboratory without having to install anything. 
+These are the links to the Google Colab notebooks:
 
 
