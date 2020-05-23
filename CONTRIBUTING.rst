@@ -14,7 +14,7 @@ Typically they will fall into one of the following two categories:
     - Once confirmed, you can implement the bug-fix.
     
 Once you finish implementing a feature or bugfix, please send a Pull Request to
-`<https://github.com/innerlogic/fos>`_
+`<https://github.com/neurallayer/fos>`_
 
 
 .. seealso:: If you are not familiar with creating a Pull Request, here are some guides:
