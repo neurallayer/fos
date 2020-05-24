@@ -1,5 +1,5 @@
-Meters
-======
+Callbacks
+=========
 The meters main function is to capture the generated metrics and display them. Display can be printing them in 
 a ``Jupyter notebook`` cell, but also logging them to a ``tensorboard`` file or inserting them in a database.
 
@@ -31,32 +31,3 @@ Example::
 .. autoclass:: MemoryMeter
 .. autoclass:: TensorBoardMeter
 
-
-Calculators
-===========
-Calculators are used by several meters to perform the required calculations. Typically during training and validation epoch,
-the calculator get updated with the values of a metric. When the display method is invoked, the calulator calculates the resulting value, like the average of that metric so far and return this to the meter.
-
-.. currentmodule:: fos.calc
-
-.. autoclass:: Calculator
-    :members:
-
-Standard Calculators
---------------------
-A number of calulators are included that perform basic calculations like the average or momentum over
-a series of metric values.
-
-.. autoclass:: AvgCalc
-.. autoclass:: MinCalc
-.. autoclass:: MaxCalc
-.. autoclass:: RecentCalc
-.. autoclass:: MomentumCalc
-
-Precision Calculators
----------------------
-There are also calculators included that perform precision and recall type of calculations:
-
-.. autoclass:: PrecisionCalculator
-.. autoclass:: RecallCalculator
-.. autoclass:: BetaCalculator

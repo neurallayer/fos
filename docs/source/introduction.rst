@@ -1,6 +1,6 @@
 Introduction
 ============
-This document provides insights into the thoughts and ideas behind FOS and 
+This document provides some insights into the thoughts and ideas behind FOS and 
 helps to better understand how to use and extend FOS. The main guiding principles are
 
 *  **Simple** to use and extend. The basic funcitonality should be easy to grasp so you quickly can get started. 
@@ -81,7 +81,9 @@ Workout
 Workout is the central component that adds a loss function and optimizer to the model that you want to train.
 So you create an instance by providing the model you want to train, the loss function, the optimizer and metrics::
 
-    workout = Workout(model, loss_fn, optim, acc=metric1, someother=metric2)
+    workout = Workout(model, loss_fn, optim; metric_name1=metric1, metric_name2=metric2)
+
+You can use arbritrary metric names 
 
 
 Training
@@ -90,18 +92,27 @@ After you created the workout, the training can start::
 
     trainer.run(data, validation_data, epochs=10, callbacks=[NotebookMeter()])
 
+If you don't provide validation data, the validation step will be skipped. If you don't provide any callbacks, a basic 
+print callback will be used that just print the progress after each epoch.
+
 
 Metric
 ------
 A metric is nothing more then a plain Python function that can be added to a Workout to get extra insights into
-the performance of your model. Metrics are optional and if you don't provide any, only the loss value will be added as a metric.
+the performance of your model. Metrics are optional and if you don't provide any, only the loss value will be added as a metric
+to the history. If you have a validation step, the metrics will also be run against the validaiton results and will be available 
+as ``metricname_valid``.
 
 
 Callback
 --------
-A callback captures the generated metrics and displays them by for example printing results in a Jupyter Notebook or 
-logging them to a file. Whenever the training is done with a training step, it will retrieve the generated metrics and hand them
-over to the meter. Read more about meters at callbacks.rst
+While a metric can be added to the workout, a callback can be used as a paramter to the fit function. Typically there are two types of callbacks:
+
+- A callback that captures the generated metrics and displays them by for example printing results in a Jupyter Notebook or logging them to a file. 
+Whenever the training is done with a training step, it will retrieve the generated metrics and hand them over to the meter. 
+Read more about meters at callbacks.rst.
+
+- A callback that monitors progress and decides when to stop the training.
 
 
 Inspiration
