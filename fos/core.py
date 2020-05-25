@@ -19,7 +19,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
-from torch.jit import trace
 
 # pylint: disable=W0622
 
@@ -151,7 +150,7 @@ class Workout(nn.Module):
         loss = self.loss_fn(pred, target)
         return loss, pred
 
-    def trace(self, input):
+    def trace(self, input, check_trace=False):
         '''Create a traced model and return it.
 
            Args:
@@ -160,8 +159,7 @@ class Workout(nn.Module):
         self.model.train()
         with torch.set_grad_enabled(False):
             input = self.mover(input)
-            traced_model = trace(self.model, example_inputs=input,
-                                 check_trace=False)
+            traced_model = torch.jit.trace(self.model, input, check_trace=check_trace)
             return traced_model
 
     def predict(self, input):
@@ -346,7 +344,7 @@ def _find_latest_training(rootdir: str) -> str:
 
 
 # pylint: disable=too-many-ancestors
-class SmartHistory(UserDict): 
+class SmartHistory(UserDict):
     '''Stores the values of a metric. In essence it is a dictionary with the
     key being the step when the metric was calculated and the value being the
     outcome of that calculation.
