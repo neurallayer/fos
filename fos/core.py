@@ -14,7 +14,7 @@ import os
 import logging
 from enum import Enum
 from collections import UserDict
-from typing import Callable, Iterable, Tuple, List
+from typing import Callable, Iterable, Tuple, List, NoReturn
 import numpy as np
 import torch
 import torch.nn as nn
@@ -211,7 +211,7 @@ class Workout(nn.Module):
             self._invoke_metrics(loss, pred, target, Mode.TRAIN)
             self.optim.zero_grad()
 
-    def stop(self) -> None:
+    def stop(self) -> NoReturn:
         '''Will stop the training early. Typcially invoked by a callback when the
            training is not progressing anymore.'''
         raise self.StopError()
@@ -327,7 +327,19 @@ class Workout(nn.Module):
 
 
 def _find_latest_training(rootdir: str) -> str:
-    '''Find the last saved training file.
+    '''Find the last saved training file. It will using sorting to determine
+       what is the lastest training file. Expected structure:
+
+       rootdir
+            workoutid1
+                trainingfile1
+                trainingfile2
+            workoutid2
+                trainingfile1
+            workoutid3
+                trainingfile1
+                trainingfile2
+                trainingfile3 # This file will be selected
 
        Args:
            rootdir (str): The root directory where to start the search

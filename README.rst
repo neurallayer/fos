@@ -49,6 +49,14 @@ Examples
 ========
 You can find several example Jupyter notebooks `here <https://github.com/neurallayer/fos/tree/master/examples>`_ 
 
+You can also run them on Google Colab directly:
+
+* `Basic https://colab.research.google.com/github/neurallayer/fos/blob/master/examples/basic_fos.ipynb`
+* `MINST https://colab.research.google.com/github/neurallayer/fos/blob/master/examples/mnist_fos.ipynb`
+* `Inputs https://colab.research.google.com/github/neurallayer/fos/blob/master/examples/inputs_fos.ipynb`
+* `Tensorboard https://colab.research.google.com/github/neurallayer/fos/blob/master/examples/tensorboard_fos.ipynb`
+
+
 
 Contribution
 ============
