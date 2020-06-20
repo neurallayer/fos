@@ -33,9 +33,9 @@ class Mode(Enum):
 
 
 class Workout(nn.Module):
-    '''Coordinates all the training of a model and provides many methods that
-       reduces the amount of boilerplate code required when training a model. In its the simplest form
-       it can be used as follows:
+    '''Coordinates all the training of a model and provides many methods that reduces the amount
+       of boilerplate code required when training a model. In its the simplest form it can be
+       used as follows:
 
        .. code-block:: python
 
