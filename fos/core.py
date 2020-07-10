@@ -13,7 +13,6 @@ import time
 import os
 import logging
 from enum import Enum
-from collections import UserDict
 from typing import Callable, Iterable, Tuple, List, NoReturn
 import numpy as np
 import torch
@@ -356,7 +355,7 @@ def _find_latest_training(rootdir: str) -> str:
 
 
 # pylint: disable=too-many-ancestors
-class SmartHistory(UserDict):
+class SmartHistory(dict):
     '''Stores the values of a metric. In essence it is a dictionary with the
     key being the step when the metric was calculated and the value being the
     outcome of that calculation.
