@@ -11,7 +11,7 @@ from fos import Workout, Mode
 
 Metrics = List[str]
 
-def _get_metrics2process(workout, metrics: [str]):
+def _get_metrics2process(workout, metrics: List[str]):
     return [m for m in metrics if workout.has_metric(m)]
 
 

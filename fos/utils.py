@@ -32,7 +32,7 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
 
     def __init__(self, data_source, num_samples=None, low_mem=False):
         # don't call super since it is a no-op
-        super().__init__()
+        super().__init__(None)
         self.data_source = data_source
         self.num_samples = num_samples
         self.low_mem = low_mem
@@ -58,8 +58,8 @@ class ScalableRandomSampler(torch.utils.data.Sampler):
     def __len__(self):
         return self.num_samples
 
-
-class SmartOptimizer(torch.optim.Optimizer):
+# pylint: disable=C0111
+class SmartOptimizer():
     '''Add clipping and scheduling capabilities to a regular optimizer.
 
     Args:
@@ -76,7 +76,6 @@ class SmartOptimizer(torch.optim.Optimizer):
     '''
 
     def __init__(self, optim, clipper=None, scheduler=None):
-        super().__init__()
         self.optim = optim
         self.clipper = clipper
         self.scheduler = scheduler
@@ -87,6 +86,7 @@ class SmartOptimizer(torch.optim.Optimizer):
             torch.nn.utils.clip_grad_norm_(
                 group["params"], max_norm=max_norm, norm_type=norm_type)
 
+    # pylint: disable=W0613
     def step(self, closure=None):
         if self.clipper is not None:
             self._clip()
@@ -241,6 +241,7 @@ def get_normalization(dataloader: Iterable, max_iter=None, feature_dim=1):
     mean = 0.
     step = 0
     first = True
+    axis = []
 
     for data in dataloader:
         step += 1

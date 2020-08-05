@@ -13,13 +13,14 @@ import time
 import os
 import logging
 from enum import Enum
-from typing import Callable, Iterable, Tuple, List, NoReturn
+from typing import Callable, Iterable, Tuple, List, NoReturn, Type
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 
 # pylint: disable=W0622
+
 
 class Mode(Enum):
     '''Identifies the phase the training is in. The two many phases are TRAIN and EVAL.
@@ -30,7 +31,7 @@ class Mode(Enum):
     EVAL = "val_"
     OTHER = "other_"
 
-
+# pylint: disable=W0223
 class Workout(nn.Module):
     '''Coordinates all the training of a model and provides many methods that reduces the amount
        of boilerplate code required when training a model. In its the simplest form it can be
@@ -210,17 +211,17 @@ class Workout(nn.Module):
             self._invoke_metrics(loss, pred, target, Mode.TRAIN)
             self.optim.zero_grad()
 
-    def stop(self) -> NoReturn:
+    def stop(self) -> Type[NoReturn]:
         '''Will stop the training early. Typcially invoked by a callback when the
            training is not progressing anymore.'''
         raise self.StopError()
 
-    def _invoke_callbacks(self, callbacks: [Callable], phase: Mode) -> None:
+    def _invoke_callbacks(self, callbacks: List[Callable], phase: Mode) -> None:
         for callback in callbacks:
             callback(self, phase)
 
     def fit(self, data: Iterable, valid_data: Iterable = None,
-            epochs: int = 1, callbacks: [Callable] = None) -> None:
+            epochs: int = 1, callbacks: List[Callable] = None) -> None:
         '''Run the training and optionally the validation for a number of epochs.
            If no validation data is provided, the validation cycle is skipped.
            If the validation should not run every epoch, check the `Skipper`
