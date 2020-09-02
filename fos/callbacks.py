@@ -135,6 +135,22 @@ class SilentMeter(Callback):
         pass
 
 
+class LRScheduler(Callback):
+    '''Update learning rate after each epoch'''
+
+    def __init__(self, scheduler, include_metric: str = None, mode=Mode.EVAL):
+        self.scheduler = scheduler
+        self.include_metric = include_metric
+        self.mode = mode
+
+    def __call__(self, workout: Workout, mode: Mode):
+        if self.mode == mode:
+            if self.include_metric is not None:
+                value = workout.get_metric(self.include_metric)
+                self.scheduler.step(value)
+            else:
+                self.scheduler.step()
+
 class PrintMeter(Callback):
     '''Displays the metrics by using a simple print
        statement at the end of an epoch.

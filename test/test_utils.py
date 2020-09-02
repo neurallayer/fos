@@ -2,7 +2,14 @@
 
 import torch
 from torchvision.models import resnet18
-from fos.utils import get_normalization, freeze, unfreeze
+from fos.utils import get_normalization, freeze, unfreeze, print_params
+import torch.nn as nn
+
+def get_model():
+    return nn.Sequential(
+        nn.Linear(10, 32),
+        nn.ReLU(),
+        nn.Linear(32, 1))
 
 
 def test_freezer():
@@ -19,3 +26,8 @@ def test_normalization():
     assert "mean" in norm
     assert "std" in norm
     assert len(norm["mean"]) == 100
+
+
+def test_print():
+    model = get_model()
+    print_params(model)

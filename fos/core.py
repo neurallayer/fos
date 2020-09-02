@@ -62,7 +62,7 @@ class Workout(nn.Module):
     '''
     # pylint: disable= R0902
     def __init__(self, model: nn.Module, loss_fn: Callable,
-                 optim: Optimizer = None, mover=None, scheduler=None, **metrics):
+                 optim: Optimizer = None, mover=None, **metrics):
         super().__init__()
         self.model = model
         self.metrics = metrics
@@ -75,7 +75,6 @@ class Workout(nn.Module):
         self._id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(
             model.parameters(), lr=1e-3)
-        self.scheduler = scheduler
 
     class StopError(Exception):
         '''used internally to stop the training before all the epochs have finished'''
@@ -260,9 +259,6 @@ class Workout(nn.Module):
                 self.update_history("epoch", self.epoch)
                 self._invoke_callbacks(callbacks, Mode.EVAL)
 
-                if self.scheduler:
-                    self.scheduler.step()
-
         except self.StopError:
             pass
 
@@ -366,12 +362,12 @@ class AMPWorkout(Workout):
 
     # pylint: disable= R0902
     def __init__(self, model: nn.Module, loss_fn: Callable,
-                 optim: Optimizer = None, mover=None, scheduler=None, **metrics):
+                 optim: Optimizer = None, mover=None, **metrics):
 
         if not torch.cuda.is_available():
             raise Exception("AMP based training is only supported on CUDA")
 
-        super().__init__(model, loss_fn, optim, mover, scheduler, **metrics)
+        super().__init__(model, loss_fn, optim, mover, **metrics)
         self.scaler = torch.cuda.amp.GradScaler()
 
     def update(self, *minibatch) -> None:

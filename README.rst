@@ -23,7 +23,7 @@ Or alternatively from the source::
 
     python setup.py install
     
-Fos requires Python 3.5 or higher.
+Fos requires Python 3.6 or higher.
 
 
 Usage
@@ -39,7 +39,6 @@ Then create the FOS workout that will take care of the training and output::
 
    workout = Workout(net, loss, optim)
   
-
 And we are ready to start the training::
 
    workout.fit(train_data, valid_data, epochs=5)
