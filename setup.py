@@ -1,3 +1,6 @@
+"""
+Setup script for project
+"""
 import setuptools
 import fos
 

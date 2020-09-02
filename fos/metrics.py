@@ -104,7 +104,7 @@ class ConfusionMetric(Metric):
             meter  = TensorBoardMeter(metrics={"tp": RecallCalculator()})
     '''
 
-    def __init__(self, threshold=0., sigmoid=False):
+    def __init__(self, threshold: float = 0., sigmoid: bool = False):
         self.sigmoid = sigmoid
         self.threshold = threshold
 

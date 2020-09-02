@@ -16,10 +16,10 @@ def get_model():
 
 def test_random():
     init_random()
-    a = randint(0, 1000)
+    random1 = randint(0, 1000)
     init_random()
-    b = randint(0, 1000)
-    assert a == b
+    random2 = randint(0, 1000)
+    assert random1 == random2
     init_random(42, cudnn=True)
 
 

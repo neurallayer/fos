@@ -116,7 +116,11 @@ class RegisterLR(Callback):
 
 
 class EpochSave(Callback):
-    '''Save the model at the end of every epoch.
+    '''Save the workout at the end of every epoch.
+
+       Args:
+           filename: the filename to use to save the workout. If no filename is provided
+           the default naming will be be used.
     '''
 
     def __init__(self, filename: str = None):
@@ -135,7 +139,9 @@ class SilentMeter(Callback):
 
 
 class LRScheduler(Callback):
-    '''Update learning rate after each epoch.
+    '''Update learning rate after each epoch by invoking a learning rate scehduler.
+        This callback has support for schedulers that expect a metric to base their
+        decision on.
 
         Args:
             scheduler: the learning rate scheduler to use.
@@ -171,8 +177,8 @@ class PrintMeter(Callback):
        `<https://docs.python.org/3/using/cmdline.html#cmdoption-u>`_
 
        Args:
-           metrics: which metrics should be printed.
-
+           metrics: which metrics should be printed. If no metrics are provided it will try to 
+            print the following metrics: "loss", "acc", "val_loss", "val_acc"
     '''
 
     def __init__(self, metrics: Metrics = None):

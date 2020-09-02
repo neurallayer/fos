@@ -201,8 +201,8 @@ def freeze(model, param_name=""):
         all the parameters. See also print_params.
 
         Args:
-            param_name (str): The first part of a parameter name to freeze. Can be a single string or
-            a set of strings.
+            param_name (str): The first part of a parameter name to freeze. Can be a single
+            string or a set of strings.
     '''
     _set_requires_grad(model, False, param_name)
 
@@ -211,11 +211,10 @@ def unfreeze(model, param_name=""):
         unfreeze all the parameters. See also print_params.
 
         Args:
-            layerparam_name_name (str): The first part of the parameter name to unfreeze. Can be a single
-            string or a set of strings.
+            layerparam_name_name (str): The first part of the parameter name to unfreeze.
+            Can be a single string or a set of strings.
     '''
     _set_requires_grad(model, True, param_name)
-
 
 
 
