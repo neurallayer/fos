@@ -123,9 +123,8 @@ class EpochSave(Callback):
         self.filename = filename
 
     def __call__(self, workout: Workout, mode: Mode):
-        if mode != mode.EVAL:
-            return
-        workout.save(self.filename)
+        if mode == mode.EVAL:
+            workout.save(self.filename)
 
 
 class SilentMeter(Callback):

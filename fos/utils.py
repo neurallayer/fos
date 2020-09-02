@@ -3,6 +3,7 @@ Collection of utilities that come in handy when training a model. Typially these
 when optimizing training with more advanced concepts like freezing layers or
 annealing learning rates.
 """
+import os
 import random
 from typing import Iterable
 import torch
@@ -118,13 +119,13 @@ class SmartOptimizer():
 
 
 class Skipper():
-    '''Wrap a dataloader and skip epochs. Typically used when you don't
-    want to execute the validation at every epoch.
+    '''Wrap a dataloader and skips epochs. Typically used when you don't
+    want to run the validation at every epoch.
 
     Arguments:
-        dl: the dataloader (or another iterable) that needs to be wrapped
+        dl: the dataloader (or any other iterable) that needs to be wrapped
         skip (int): how many epochs should be skipped. If skips is for example 3
-        the iterator is only run at every third epcoh.
+        the iterator is only run at every third epoch.
 
     Example usage:
 
@@ -174,6 +175,10 @@ def init_random(seed=0, cudnn=False):
     random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+
     if cudnn:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False

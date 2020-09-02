@@ -365,7 +365,7 @@ class AMPWorkout(Workout):
                  optim: Optimizer = None, mover=None, **metrics):
 
         if not torch.cuda.is_available():
-            raise Exception("AMP based training is only supported on CUDA")
+            raise Exception("AMP based training requires CUDA support")
 
         super().__init__(model, loss_fn, optim, mover, **metrics)
         self.scaler = torch.cuda.amp.GradScaler()

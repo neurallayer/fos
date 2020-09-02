@@ -1,9 +1,10 @@
 # pylint: disable=E1101, C0116, C0114
 
+from random import randint
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
-from fos.utils import get_normalization, freeze, unfreeze, print_params
+from fos.utils import get_normalization, freeze, unfreeze, print_params, init_random
 
 
 def get_model():
@@ -11,6 +12,15 @@ def get_model():
         nn.Linear(10, 32),
         nn.ReLU(),
         nn.Linear(32, 1))
+
+
+def test_random():
+    init_random()
+    a = randint(0, 1000)
+    init_random()
+    b = randint(0, 1000)
+    assert a == b
+    init_random(42, cudnn=True)
 
 
 def test_freezer():
