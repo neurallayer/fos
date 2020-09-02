@@ -62,7 +62,7 @@ class Workout(nn.Module):
     '''
     # pylint: disable= R0902
     def __init__(self, model: nn.Module, loss_fn: Callable,
-                 optim: Optimizer = None, mover=None, **metrics):
+                 optim: Optimizer = None, mover=None, scheduler=None, **metrics):
         super().__init__()
         self.model = model
         self.metrics = metrics
@@ -75,6 +75,7 @@ class Workout(nn.Module):
         self._id = str(int(time.time()))
         self.optim = optim if optim is not None else torch.optim.SGD(
             model.parameters(), lr=1e-3)
+        self.scheduler = scheduler
 
     class StopError(Exception):
         '''used internally to stop the training before all the epochs have finished'''
@@ -259,6 +260,9 @@ class Workout(nn.Module):
                 self.update_history("epoch", self.epoch)
                 self._invoke_callbacks(callbacks, Mode.EVAL)
 
+                if self.scheduler:
+                    self.scheduler.step()
+
         except self.StopError:
             pass
 
@@ -353,6 +357,39 @@ def _find_latest_training(rootdir: str) -> str:
             "Couldn't find previously saved training files at directory %s",
             rootdir)
         return None
+
+
+class AMPWorkout(Workout):
+    """"Workout to uses the Automatic Mixed Precision (AMP) feature. This feature enables
+    automatic conversion of certain GPU operations from FP32 precision to mixed precision,
+    thus improving performance while maintaining accuracy."""
+
+    # pylint: disable= R0902
+    def __init__(self, model: nn.Module, loss_fn: Callable,
+                 optim: Optimizer = None, mover=None, scheduler=None, **metrics):
+
+        if not torch.cuda.is_available():
+            raise Exception("AMP based training is only supported on CUDA")
+
+        super().__init__(model, loss_fn, optim, mover, scheduler, **metrics)
+        self.scaler = torch.cuda.amp.GradScaler()
+
+    def update(self, *minibatch) -> None:
+        self.model.train()
+        scaler = self.scaler
+        with torch.set_grad_enabled(True):
+            input, target = self.mover(minibatch)
+
+            with torch.cuda.amp.autocast():
+                loss, pred = self(input, target)
+
+            scaler.scale(loss).backward()
+            scaler.step(self.optim)
+            scaler.update()
+
+            self.step += 1
+            self._invoke_metrics(loss, pred, target, Mode.TRAIN)
+            self.optim.zero_grad()
 
 
 # pylint: disable=too-many-ancestors

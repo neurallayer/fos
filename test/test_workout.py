@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fos import Workout
+from fos import Workout, AMPWorkout
 
 
 def get_model():
@@ -17,7 +17,7 @@ def get_data(steps):
     return [(torch.randn(16, 10), torch.rand(16, 1)) for i in range(steps)]
 
 
-def test_trainer():
+def test_workout():
     model = get_model()
     loss = F.mse_loss
     optim = torch.optim.Adam(model.parameters())
@@ -39,7 +39,33 @@ def test_trainer():
     assert workout.epoch == 16
 
 
-def test_trainer_predict():
+def test_ampworkout():
+    if not torch.cuda.is_available():
+        return
+
+    model = get_model().to("cuda")
+    loss = F.mse_loss
+    optim = torch.optim.Adam(model.parameters())
+    workout = AMPWorkout(model, loss, optim)
+
+    data = get_data(100)
+    workout.fit(data)
+    assert workout.epoch == 1
+
+    workout.fit(data, epochs=10)
+    assert workout.epoch == 11
+
+    valid_data = get_data(100)
+    for minibatch in valid_data:
+        workout.validate(*minibatch)
+    assert workout.epoch == 11
+
+    workout.fit(data, valid_data, epochs=5)
+    assert workout.epoch == 16
+
+
+
+def test_predict():
 
     model = get_model()
     loss = F.mse_loss
