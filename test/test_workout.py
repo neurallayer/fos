@@ -1,10 +1,10 @@
 # pylint: disable=E1101, C0116, C0114
-from fos.callbacks import LRScheduler
 import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fos import Workout, AMPWorkout
+from fos.callbacks import LRScheduler
 
 
 def get_model():
@@ -46,7 +46,7 @@ def test_workout_metrics():
     loss = F.mse_loss
     optim = torch.optim.Adam(model.parameters())
 
-    def my_metric(a,b):
+    def my_metric(*_):
         return 1.0
 
     workout = Workout(model, loss, optim, my_metric=my_metric)
@@ -98,6 +98,14 @@ def test_lr_scheduler():
     workout.fit(data, epochs=30, callbacks=[callback])
     assert workout.optim.param_groups[0]['lr'] == 1e-05
 
+    model = get_model()
+    val_data = get_data(25)
+    optim = torch.optim.Adam(model.parameters(), lr=1e-02)
+    workout = Workout(model, loss, optim)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim)
+    callback = LRScheduler(scheduler, "val_loss")
+    workout.fit(data, val_data, epochs=100, callbacks=[callback])
+    assert workout.optim.param_groups[0]['lr'] < 1e-02
 
 def test_predict():
     model = get_model()

@@ -1,9 +1,10 @@
 # pylint: disable=E1101, C0116, C0114
 
 import torch
+import torch.nn as nn
 from torchvision.models import resnet18
 from fos.utils import get_normalization, freeze, unfreeze, print_params
-import torch.nn as nn
+
 
 def get_model():
     return nn.Sequential(

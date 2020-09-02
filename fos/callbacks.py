@@ -136,15 +136,25 @@ class SilentMeter(Callback):
 
 
 class LRScheduler(Callback):
-    '''Update learning rate after each epoch'''
+    '''Update learning rate after each epoch.
 
-    def __init__(self, scheduler, include_metric: str = None, mode=Mode.EVAL):
+        Args:
+            scheduler: the learning rate scheduler to use.
+            include_metric: the metric to include when calling scheduler.step.
+
+        Usage:
+            optim = torch.optim.Adam(model.parameters(), lr=1e-02)
+            scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.1)
+            callback = LRScheduler(scheduler)
+            workout.fit(data, epochs=30, callbacks=[callback])
+    '''
+
+    def __init__(self, scheduler, include_metric: str = None):
         self.scheduler = scheduler
         self.include_metric = include_metric
-        self.mode = mode
 
     def __call__(self, workout: Workout, mode: Mode):
-        if self.mode == mode:
+        if mode == Mode.EVAL:
             if self.include_metric is not None:
                 value = workout.get_metric(self.include_metric)
                 self.scheduler.step(value)
